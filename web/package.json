@@ -1,8 +1,8 @@
 {
-  "name": "mod-wei-web",
+  "name": "mw-web",
   "version": "0.1.0",
   "private": true,
-  "description": "Live LLM microscope — Next.js frontend for mod_wei",
+  "description": "Live LLM microscope — Next.js frontend for mw",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "next": "^15.1.0",
+    "next": "^16.4.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

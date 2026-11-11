@@ -1,4 +1,4 @@
-# web/ — the mod_wei microscope
+# web/ — the mw microscope
 
 Next.js (App Router, TypeScript). **The brain is the product; chat is a 300 px
 rail.** Contract: [`../app/PROTOCOL.md`](../app/PROTOCOL.md). Visual system:
@@ -133,7 +133,7 @@ set `NEXT_PUBLIC_WS_URL=wss://<host>/ws`.
 ## Files
 
 ```
-app/layout.tsx             html/body, fonts, metadata "mod_wei"
+app/layout.tsx             html/body, fonts, metadata "mw"
 app/page.tsx               shell, brain wiring, export, Esc, onboarding
 app/globals.css            black instrument system, layout, panel tabs
 components/BrainGraph.tsx  canvas layer columns, particles, HUD, hover/pick

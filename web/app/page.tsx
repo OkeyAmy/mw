@@ -14,7 +14,7 @@ const ONBOARD_KEY = "mod_wei.onboarded.v1";
 
 function buildExport(messages: ChatMessage[], info: ModelInfo | null, steering: Steering) {
   return {
-    format: "mod_wei.session.v1",
+    format: "mw.session.v1",
     exported_at: new Date().toISOString(),
     model: info,
     steering,
@@ -149,7 +149,7 @@ export default function Page() {
     const a = document.createElement("a");
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     a.href = url;
-    a.download = `mod_wei_session_${stamp}.json`;
+    a.download = `mw_session_${stamp}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -181,7 +181,7 @@ export default function Page() {
         <div className="rail-head">
           {railOpen ? (
             <>
-              <span className="brand">mod_wei</span>
+              <span className="brand">mw</span>
               <span className={`dot ${dotTone}`} />
               <button
                 type="button"

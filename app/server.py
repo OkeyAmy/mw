@@ -292,7 +292,15 @@ class SteerState:
 
 
 class GenControl:
-    """Cross-thread control for one generation run."""
+    """Cross-thread control for one generation run.
+
+    The injection queue is guarded by `_inj_lock` together with a `_closed`
+    flag. A turn is closed before the worker decides to stop, so an `inject`
+    that races the last token either lands in this turn (it was queued before
+    the close) or is reported as refused and starts a new turn in the socket
+    handler. Without that handshake an injection arriving between the worker's
+    final `pop_injection()` and `done` was silently lost.
+    """
 
     def __init__(self, steer: SteerState):
         self.steer = steer
@@ -301,12 +309,31 @@ class GenControl:
         self.restart: list[dict] | None = None   # replacement transcript
         self.step = 0          # monotonic across restarts / injected turns
         self.eos = False       # set by the stream loop when it hits eos
+        self._inj_lock = threading.Lock()
+        self._closed = False
+
+    def inject(self, text: str) -> bool:
+        """Queue an injection for this turn. False = this turn has closed."""
+        with self._inj_lock:
+            if self._closed:
+                return False
+            self.injections.put(text)
+            return True
+
+    def close(self) -> None:
+        with self._inj_lock:
+            self._closed = True
+
+    def reopen(self) -> None:
+        with self._inj_lock:
+            self._closed = False
 
     def pop_injection(self) -> str | None:
-        try:
-            return self.injections.get_nowait()
-        except queue.Empty:
-            return None
+        with self._inj_lock:
+            try:
+                return self.injections.get_nowait()
+            except queue.Empty:
+                return None
 
 
 class Generation:
@@ -474,12 +501,58 @@ class LiveAdapter(ModelAdapter):
     without an inserted sentence). Formatting the insertion as a user turn DOES
     change the continuation. So we render it through the model's own chat
     template when one exists, and fall back to a delimited turn otherwise.
+
+    The turn must be rendered as a DELTA against the conversation that is
+    already in the KV cache. Rendering `[{"role": "user", ...}]` on its own
+    re-emits the whole preamble: on Granite each injection inserted a second
+    '<|start_of_role|>system<|end_of_role|>Knowledge Cutoff ... You are
+    Granite' block mid-stream (67 tokens instead of 18) and left the assistant
+    turn unterminated. That is what corrupted the continuation.
     """
 
     use_chat_template: bool = True
 
     def _has_template(self) -> bool:
         return bool(self.use_chat_template and getattr(self.tok, "chat_template", None))
+
+    def _injection_delta(self, text: str) -> str | None:
+        """The template's own 'close turn + user turn + assistant prompt' text.
+
+        Render the same conversation twice: once up to the open assistant turn
+        (`head`), once with an *empty* assistant message and the injected user
+        turn appended (`full`). `head` is a prefix of `full` for every sane
+        chat template, so the suffix is exactly what may be appended to a
+        conversation already in the cache:
+
+            <turn terminator><user role>text<turn terminator><assistant role>
+
+        No system preamble, because the preamble is inside the common prefix.
+        Works for Granite, ChatML/Qwen and Llama-3 style templates; returns
+        None when the template does not have that shape.
+        """
+        probe = [{"role": "user", "content": "x"}]
+        try:
+            head = self.tok.apply_chat_template(
+                probe, add_generation_prompt=True, tokenize=False)
+            full = self.tok.apply_chat_template(
+                probe + [{"role": "assistant", "content": ""},
+                         {"role": "user", "content": text}],
+                add_generation_prompt=True, tokenize=False)
+        except Exception:  # noqa: BLE001 - a template that refuses this shape
+            return None
+        if not isinstance(head, str) or not isinstance(full, str):
+            return None
+        if full.startswith(head) and len(full) > len(head):
+            return full[len(head):]
+        # Whitespace at the seam may differ; fall back to the common prefix but
+        # only accept a delta that actually carries the injected text.
+        n = 0
+        for a, b in zip(head, full):
+            if a != b:
+                break
+            n += 1
+        delta = full[n:]
+        return delta if delta and text in delta else None
 
     def format_messages(self, messages: list[dict]):
         """Render the FULL transcript before generation (no cold single turn)."""
@@ -501,14 +574,25 @@ class LiveAdapter(ModelAdapter):
         return self.format_messages([{"role": "user", "content": prompt}])
 
     def format_injection(self, text: str):
-        """Render the insertion as a NEW user turn, never as bare text."""
-        if self._has_template():
-            turn = self.tok.apply_chat_template(
-                [{"role": "user", "content": text}],
-                add_generation_prompt=True, tokenize=False)
-            return self.tok(turn, return_tensors="pt", add_special_tokens=False).input_ids
-        return self.tok("\nUser: " + text + "\nAssistant:",
-                        return_tensors="pt").input_ids
+        """Render the insertion as the TAIL of a new user turn, never as bare text.
+
+        Appending this to the live context closes the in-progress assistant
+        message, adds exactly one user turn and reopens the assistant role.
+        """
+        if not self._has_template():
+            return self.tok("\nUser: " + text + "\nAssistant:",
+                            return_tensors="pt").input_ids
+        delta = self._injection_delta(text)
+        if delta:
+            return self.tok(delta, return_tensors="pt",
+                            add_special_tokens=False).input_ids
+        # The template did not expose a clean delta. A full single-turn render
+        # is still a real user turn (it just repeats the preamble) and is
+        # measurably better than appending bare text.
+        turn = self.tok.apply_chat_template(
+            [{"role": "user", "content": text}],
+            add_generation_prompt=True, tokenize=False)
+        return self.tok(turn, return_tensors="pt", add_special_tokens=False).input_ids
 
     def apply_steering(self, state: SteerState, vectors: dict) -> None:
         if state.layer is None or abs(state.coef) < 1e-6 or state.layer not in vectors:
@@ -886,17 +970,24 @@ def _worker(gen: Generation, send) -> None:
                 send({"type": "restarted", "session": sid, "prompt": gen.prompt})
                 continue
             reason = "eos" if gen.control.eos else "max_new"
-            # An injection that arrives as generation ends starts a new turn.
+            # Seal this turn BEFORE checking for a late injection. An inject
+            # that loses this race is refused by GenControl.inject() and starts
+            # a fresh turn in the socket handler instead of being silently
+            # dropped between the final pop and `done`.
+            gen.control.close()
             text = gen.control.pop_injection()
-            if text is not None:
-                nt = int(ENGINE.adapter.format_injection(text).shape[1])
-                note_injected(gen.control.step, nt, text)
-                gen.messages = gen.messages + [
-                    {"role": "assistant", "content": gen.text},
-                    {"role": "user", "content": text},
-                ]
-                continue
-            break
+            if text is None:
+                break
+            # An injection that arrived as generation ended starts a new turn.
+            gen.control.reopen()
+            nt = int(ENGINE.adapter.format_injection(text).shape[1])
+            note_injected(gen.control.step, nt, text)
+            turn = list(gen.messages)
+            if gen.text:
+                turn.append({"role": "assistant", "content": gen.text})
+            turn.append({"role": "user", "content": text})
+            gen.messages = turn
+            continue
     except Exception as exc:  # noqa: BLE001 - report, never die silently
         failed = True
         sys.stderr.write(f"[mod_wei] generation failed: {type(exc).__name__}: {exc}\n")
@@ -1084,22 +1175,32 @@ async def ws(sock: WebSocket):
                                       "message": describe_validation_error(exc)})
                     continue
                 active = CURRENT.get("gen")
-                if isinstance(active, Generation) and active is mine:
-                    mine.control.injections.put(inj.text)
-                else:
-                    # Generation already finished: the inject starts a new turn
-                    # inside the same conversation.
-                    nt = int(ENGINE.adapter.format_injection(inj.text).shape[1])
-                    prior = list(last_gen.messages) if last_gen else []
-                    if last_gen is not None and last_gen.text:
-                        prior.append({"role": "assistant", "content": last_gen.text})
-                    prior.append({"role": "user", "content": inj.text})
-                    await send_async({"type": "injected", "session":
-                                      last_gen.session if last_gen else None,
-                                      "at_step": 0, "tokens": nt, "text": inj.text})
-                    mine = start(prior, 40)
-                    mine.injected_at = 0        # this turn was seeded by an injection
-                    last_gen = mine
+                if (isinstance(active, Generation) and active is mine
+                        and mine.control.inject(inj.text)):
+                    # Queued; the stream loop applies it at the next token
+                    # boundary. inject() is False once the turn has closed.
+                    continue
+                # The turn has ended (or is ending): the inject starts a new
+                # turn inside the same conversation. A worker finishing its
+                # last token may still hold the lock for a few milliseconds.
+                for _ in range(100):
+                    if not GEN_LOCK.locked():
+                        break
+                    await asyncio.sleep(0.01)
+                if GEN_LOCK.locked():
+                    await send_async({"type": "error", "message": "server busy"})
+                    continue
+                nt = int(ENGINE.adapter.format_injection(inj.text).shape[1])
+                prior = list(last_gen.messages) if last_gen else []
+                if last_gen is not None and last_gen.text:
+                    prior.append({"role": "assistant", "content": last_gen.text})
+                prior.append({"role": "user", "content": inj.text})
+                await send_async({"type": "injected", "session":
+                                  last_gen.session if last_gen else None,
+                                  "at_step": 0, "tokens": nt, "text": inj.text})
+                mine = start(prior, 40)
+                mine.injected_at = 0        # this turn was seeded by an injection
+                last_gen = mine
 
             elif kind == "edit_prompt":
                 try:
