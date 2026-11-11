@@ -227,9 +227,19 @@ def test_granite_token_count_drops_from_67_to_18():
 def test_no_template_fallback_is_still_a_delimited_turn(tmp_path):
     a = _adapter_with_template(tmp_path, GRANITE_TEMPLATE)
     a.use_chat_template = False
-    out = a.tok.decode(a.format_injection("hi")[0])
-    assert out == "\nUser: hi\nAssistant:"
-    assert "<|start_of_role|>" not in out
+
+    class _Spy:
+        def __init__(self, tok):
+            self.tok, self.seen = tok, []
+
+        def __call__(self, text, **kwargs):
+            self.seen.append(text)
+            return self.tok(text, **kwargs)
+
+    spy = _Spy(a.tok)
+    a.tok = spy
+    a.format_injection("hi")
+    assert spy.seen == ["\nUser: hi\nAssistant:"]
 
 
 # -- behavioural equivalence --------------------------------------------------
@@ -281,39 +291,30 @@ def test_injection_is_fed_exactly_once_in_order(adapter):
 
     a.model.forward = spy
     yielded: list[int] = []
+    first, second = "return", "="
     try:
         for tr in a.stream([{"role": "user", "content": PROMPT}], 5,
                            control=control,
                            on_injected=lambda _at, _n, text: seen.append(text)):
             yielded.append(tr["token_id"])
             if len(yielded) == 2:
-                assert control.inject("first note")
-                assert control.inject("second note")
+                assert control.inject(first)
+                assert control.inject(second)
     finally:
         del a.model.forward
 
-    assert seen == ["first note", "second note"], "injections were reordered"
+    assert seen == [first, second], "injections were reordered"
 
-    e1 = a.format_injection("first note")[0].tolist()
-    e2 = a.format_injection("second note")[0].tolist()
-    flat = [t for call in calls for t in call]
-    i1 = next((i for i in range(len(flat)) if flat[i:i + len(e1)] == e1), None)
-    assert i1 is not None, "the first injection was never fed"
-    i2 = next((i for i in range(len(flat)) if flat[i:i + len(e2)] == e2), None)
-    assert i2 is not None, "the second injection was never fed"
-    assert i1 < i2, "injections were applied out of order"
-    assert flat.count(e1[0]) >= 1
-    # each injected turn is present once, not duplicated by a re-feed
-    assert _count_subseq(flat, e1) == 1
-    assert _count_subseq(flat, e2) == 1
-
-
-def _count_subseq(haystack: list[int], needle: list[int]) -> int:
-    n, count = len(needle), 0
-    for i in range(len(haystack) - n + 1):
-        if haystack[i:i + n] == needle:
-            count += 1
-    return count
+    e1 = a.format_injection(first)[0].tolist()
+    e2 = a.format_injection(second)[0].tolist()
+    assert e1 != e2
+    # multi-token forwards are: prefill, then the two injection forwards
+    multi = [c for c in calls if len(c) > 1]
+    assert len(multi) == 3, f"expected 2 injection forwards, got {len(multi) - 1}"
+    assert multi[0] == a.format_messages([{"role": "user", "content": PROMPT}])[0].tolist()
+    assert multi[1] == [yielded[1]] + e1, (
+        "the first injection is not fed right after the pre-boundary token")
+    assert multi[2] == e2, "the second injection is not fed after the first"
 
 
 # -- queue handshake ----------------------------------------------------------

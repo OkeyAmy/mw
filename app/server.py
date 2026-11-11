@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-mod_wei live server — stream tokens AND the internal trace behind each one.
+mw live server — stream tokens AND the internal trace behind each one.
 
 Implements app/PROTOCOL.md on top of the audited `mw.adapter.ModelAdapter`.
 Backend responsibilities:
@@ -819,14 +819,14 @@ def _watchdog_tick(now: float | None = None) -> None:
         gen.timed_out = True
         gen.control.cancel.set()
         GENERATIONS_TIMED_OUT += 1
-        print(f"[mod_wei] WATCHDOG: generation ran {elapsed:.1f}s "
+        print(f"[mw] WATCHDOG: generation ran {elapsed:.1f}s "
               f"(limit {GEN_TIMEOUT_S:.0f}s) — cancelling at the next token",
               flush=True)
         return
 
     if elapsed > GEN_TIMEOUT_S + GEN_HARD_GRACE_S and GEN_LOCK.force_release():
         sys.stderr.write(
-            f"[mod_wei] WATCHDOG: generation still stuck after {elapsed:.1f}s; "
+            f"[mw] WATCHDOG: generation still stuck after {elapsed:.1f}s; "
             f"force-releasing the generation lock\n")
         sys.stderr.flush()
         if CURRENT.get("gen") is gen:
@@ -839,10 +839,10 @@ def _watchdog_loop() -> None:
         try:
             _watchdog_tick()
         except Exception as exc:  # noqa: BLE001 - a watchdog must never die
-            sys.stderr.write(f"[mod_wei] watchdog error: {type(exc).__name__}: {exc}\n")
+            sys.stderr.write(f"[mw] watchdog error: {type(exc).__name__}: {exc}\n")
             sys.stderr.flush()
 
-app = FastAPI(title="mod_wei live")
+app = FastAPI(title="mw live")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -990,7 +990,7 @@ def _worker(gen: Generation, send) -> None:
             continue
     except Exception as exc:  # noqa: BLE001 - report, never die silently
         failed = True
-        sys.stderr.write(f"[mod_wei] generation failed: {type(exc).__name__}: {exc}\n")
+        sys.stderr.write(f"[mw] generation failed: {type(exc).__name__}: {exc}\n")
         sys.stderr.flush()
         send({"type": "error", "message": f"{type(exc).__name__}: {exc}"})
         reason = "error"
@@ -1238,7 +1238,7 @@ class _Server(uvicorn.Server):
             name = signal.Signals(sig).name
         except ValueError:
             name = str(sig)
-        print(f"[mod_wei] {name}: cancelling generation, shutting down", flush=True)
+        print(f"[mw] {name}: cancelling generation, shutting down", flush=True)
         _cancel_current()
         super().handle_exit(sig, frame)
 
@@ -1264,23 +1264,23 @@ def main() -> int:
     START_TIME = time.monotonic()
     dt = {"float32": torch.float32, "float16": torch.float16,
           "bfloat16": torch.bfloat16}[args.dtype]
-    print(f"[mod_wei] loading {args.model} ({args.dtype})", flush=True)
+    print(f"[mw] loading {args.model} ({args.dtype})", flush=True)
     try:
         ENGINE = Engine(args.model, dt)
         ENGINE.adapter.use_chat_template = not args.no_chat_template
-        print(f"[mod_wei] chat template: {ENGINE.adapter._has_template()}", flush=True)
+        print(f"[mw] chat template: {ENGINE.adapter._has_template()}", flush=True)
     except MemoryError:
         sys.stderr.write(
-            "[mod_wei] load refused by the memory guard — nothing was loaded, exiting.\n"
+            "[mw] load refused by the memory guard — nothing was loaded, exiting.\n"
             "          free memory, pick a smaller dtype, or set MOD_WEI_ALLOW_OOM=1.\n")
         return 2
     except ValueError as exc:
-        sys.stderr.write(f"[mod_wei] refusing to load: {exc}\n")
+        sys.stderr.write(f"[mw] refusing to load: {exc}\n")
         return 2
-    print(f"[mod_wei] {len(ENGINE.vectors)} steering vectors ready", flush=True)
-    print(f"[mod_wei] generation watchdog: {GEN_TIMEOUT_S:.0f}s "
+    print(f"[mw] {len(ENGINE.vectors)} steering vectors ready", flush=True)
+    print(f"[mw] generation watchdog: {GEN_TIMEOUT_S:.0f}s "
           f"(hard grace {GEN_HARD_GRACE_S:.0f}s)", flush=True)
-    print(f"[mod_wei] http://{args.host}:{args.port}", flush=True)
+    print(f"[mw] http://{args.host}:{args.port}", flush=True)
 
     WATCHDOG_STOP.clear()
     threading.Thread(target=_watchdog_loop, name="modwei-watchdog",
@@ -1296,7 +1296,7 @@ def main() -> int:
     # re-raise would kill the process with the signal, so install a no-op exit
     # handler: shutdown already happened, we just want a clean rc=0.
     def _after_drain(signum, _frame):
-        print(f"[mod_wei] {signal.Signals(signum).name} drained", flush=True)
+        print(f"[mw] {signal.Signals(signum).name} drained", flush=True)
         _cancel_current()
         server.should_exit = True
 
@@ -1313,7 +1313,7 @@ def main() -> int:
             with contextlib.suppress(Exception):
                 if GEN_LOCK.acquire(timeout=10):
                     GEN_LOCK.release()
-    print("[mod_wei] stopped", flush=True)
+    print("[mw] stopped", flush=True)
     return 0
 
 

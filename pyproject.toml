@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mod-wei"
+name = "mw"
 version = "0.1.0"
 description = "Local-first, architecture-agnostic LLM microscope: trace, attribute, and steer open-weight models with controls."
 readme = "README.md"

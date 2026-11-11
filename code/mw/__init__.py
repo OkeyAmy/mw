@@ -1,4 +1,4 @@
-"""mw — mod_wei model adapter layer."""
+"""mw — model adapter layer."""
 from .adapter import VIS_BLACKBOX, VIS_FULL, VIS_PARTIAL, Capabilities, ModelAdapter
 from .registry import HF_SUPPORTED, SPECS, ArchSpec, resolve
 

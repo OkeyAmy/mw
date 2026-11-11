@@ -1,4 +1,4 @@
-# mod_wei
+# mw
 
 **A local-first microscope for open-weight language models.** Trace what a model
 does inside, prove which activations are causal, and intervene — with controls

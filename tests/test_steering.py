@@ -185,16 +185,22 @@ def test_provenance_fields_are_per_token(ad):
     assert nframes[0]["steer_layer"] is None
 
 
-def test_steering_changes_the_generated_tokens(ad):
-    """End-to-end: identical prompt, coef=0 vs coef=2 must not produce the same
-    token ids. `max_new` is small so this stays fast."""
-    ids_off = [f["token_id"] for f in _stream(ad, SteerState(), n=4)]
+def test_steering_changes_the_next_token_distribution(ad):
+    """End-to-end through the live stream path: identical prompt, coef=0 vs
+    coef=2 must change the per-step next-token distribution.
+
+    A random untrained model can settle on the same argmax at every step, so the
+    oracle is the distribution the frame carries (`topk`), not the sampled id —
+    on real weights the argmax usually moves too (measured live: see
+    agents/S1_steering.md).
+    """
+    off = _stream(ad, SteerState(), n=4)
     state = SteerState()
     state.set_base(2, 2.0)
-    ids_on = [f["token_id"] for f in _stream(ad, state, n=4)]
-    assert ids_off and ids_on
-    assert ids_off != ids_on, (
-        f"steering did not change a single token: {ids_off} == {ids_on}")
+    on = _stream(ad, state, n=4)
+    assert len(off) == len(on) >= 1
+    diff = [abs(a["topk"][0][1] - b["topk"][0][1]) for a, b in zip(off, on)]
+    assert max(diff) > 1e-4, f"steering left the distribution untouched: {off[0]['topk']}"
 
 
 # -- 6. per-connection isolation -------------------------------------------
@@ -230,7 +236,8 @@ def test_streams_with_different_states_diverge(ad):
     fb = _stream(ad, b, n=3)
     assert {f["steered"] for f in fa} == {True}
     assert {f["steered"] for f in fb} == {False}
-    assert [f["token_id"] for f in fa] != [f["token_id"] for f in fb]
+    assert any(x["topk"] != y["topk"] for x, y in zip(fa, fb)), (
+        "two connections produced identical distributions — the state leaked")
 
 
 # -- 7. the server's apply_steering guard ----------------------------------
