@@ -1,0 +1,26 @@
+# weights and envs stay local — never commit or upload these
+.hf/
+.venv/
+.venv-a1/
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.npy
+
+# proof artifacts are regenerable; keep the text summaries, drop big dumps
+proof/*.npy
+proof/*.pt
+
+# python / tooling
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# local notes
+.env
+.DS_Store

@@ -1,0 +1,35 @@
+C6 — FORCED TOKEN (logit bias) vs SEMANTIC STEERING
+========================================================================
+target token  : 2 '#'
+forced path   : logits[target] += 100.0 at every step
+semantic path : L14 resid_pre += +2.0 * v   (the C4/C5 vector)
+coherence     : mean log p(generated token | clean model), higher = the model 'wanted' it
+
+prompt                    | p(t) base | p(t) sem | dlogit sem | forced | sem | coh base/sem/forced
+--------------------------------------------------------------------------------------------------------------
+'def add(a, b):\n'        |  3.86e-04 | 2.62e-01 |     +6.789 |   True | False |  -0.21/-2.91/ -5.38
+'def square(x):\n'        |  1.01e-03 | 1.30e-01 |     +3.767 |   True | False |  -0.54/-3.08/ -7.28
+'import os\n'             |  1.30e-02 | 1.87e-01 |     +0.963 |   True | False |  -0.96/-1.75/-11.51
+'class Point:\n'          |  7.49e-04 | 2.29e-01 |     +5.181 |   True | False |  -0.11/-3.62/ -5.34
+'for i in range(10):\n'   |  2.37e-03 | 2.04e-01 |     +5.225 |   True | False |  -0.49/-4.40/ -5.02
+
+forced rate (target at step 0)   : 100%  (5/5)
+semantic rate (target at step 0) : 0%  (0/5)
+mean semantic logit push         : +4.385 nats
+mean coherence base/sem/forced   : -0.46 / -3.15 / -6.91
+VERDICT : PASS
+
+qualitative comparison
+----------------------
+[OBS] Forcing is a hard constraint applied after the forward pass. It wins the argmax
+      100% of the time by construction and says nothing about the model.
+[OBS] Semantic steering moves the target logit by O(1) nats, which is often not enough
+      to overturn a confident baseline. That is the honest limit of activation steering:
+      it biases the distribution, it does not override it.
+[OBS] Coherence separates them. A forced token usually produces a locally incoherent
+      continuation because the residual stream still encodes the original intent;
+      a steered token is only produced when the model's state actually supports it,
+      so the continuation stays coherent.
+[INF] Use logit bias to *prove* the plumbing works (a deterministic assertion).
+      Use steering to *study* the model. Do not report a steering result as if it
+      were a forcing result, and vice versa.

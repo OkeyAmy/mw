@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mod-wei"
+version = "0.1.0"
+description = "Local-first, architecture-agnostic LLM microscope: trace, attribute, and steer open-weight models with controls."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10,<3.14"
+dependencies = [
+  "torch>=2.2",
+  "transformers>=4.45",
+  "safetensors>=0.4",
+  "numpy>=1.26",
+  "huggingface-hub>=0.24",
+  "gguf>=0.10",
+  "pydantic>=2",
+]
+
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-timeout>=2", "ruff>=0.5"]
+app = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "websockets>=12",
+  "httpx>=0.27",
+]
+
+[tool.setuptools.packages.find]
+where = ["code"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "slow: needs a downloaded model; skipped in CI",
+  "gpu: needs CUDA; never run in CI",
+]
+addopts = "-q --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

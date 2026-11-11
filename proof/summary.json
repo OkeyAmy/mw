@@ -1,0 +1,26 @@
+{
+  "C1": {
+    "status": "PASS",
+    "metric": "layers=28 T=12 d=1536 shape_ok=True finite=True hs_maxdiff=0.000e+00 finalnorm_maxdiff=0.000e+00"
+  },
+  "C2": {
+    "status": "PASS",
+    "metric": "max_abs_diff=0.000e+00 (threshold 1e-4) last_pos=0.000e+00"
+  },
+  "C3": {
+    "status": "PASS",
+    "metric": "best_layer=L23 recovery=1.056 target=' Paris' self_patch_exact=True rand_dir_recovery=-2.042 L0_recovery=-0.008"
+  },
+  "C4": {
+    "status": "FAIL",
+    "metric": "layer=L8 spearman=+0.964 eff(+3)=+7.348 eff(-3)=-3.484 coef0_bitidentical=True rand_ok=False"
+  },
+  "C5": {
+    "status": "PASS",
+    "metric": "switch_step=6 pre_exact=True post_nonzero=True first_token_divergence=7 maxd@step6=1.072e+01"
+  },
+  "C6": {
+    "status": "PASS",
+    "metric": "forced_rate=1.00 semantic_rate=0.00 semantic_dlogit=+4.385 coherence base/sem/forced=-0.46/-3.15/-6.91"
+  }
+}

@@ -1,0 +1,12 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+PRECONDITION MISSING
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  model_weights_incomplete (no weight files linked into snapshot)
+
+  The proof chain cannot run yet. Nothing below is a result.
+  Fix the precondition, then re-run:
+      python code/proof_chain.py
+
+  Reminder: this harness never downloads. The model must already be
+  complete under /home/okey/Desktop/Projects/mod_wei/.hf and torch/transformers installed in .venv.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

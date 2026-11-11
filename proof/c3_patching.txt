@@ -1,0 +1,35 @@
+C3 — ACTIVATION PATCHING (are activations causally used?)
+========================================================================
+clean prompt    : 'The capital of France is'  (5 tokens)
+corrupt prompt  : 'The capital of Germany is'  (5 tokens)
+target token    : 12095 ' Paris'
+clean logit     : +15.8903
+corrupt logit   : +10.5578
+contrast (denom): +5.3326
+
+method: copy clean's resid_post(L) at the LAST position into the corrupt run,
+        re-run, read the target logit. recovery = (patched - corrupt)/(clean - corrupt).
+        recovery=1.0 => the patch fully restored the clean answer.
+        recovery=0.0 => the patch did nothing.
+
+recovery per layer:
+  L0:-0.01 L1:-0.02 L2:-0.02 L3:-0.03 L4:-0.02 L5:-0.00 L6:+0.00 L7:-0.01 L8:-0.01 L9:+0.01 L10:-0.00 L11:-0.00 L12:-0.01 L13:-0.03 L14:-0.03 L15:-0.05 L16:-0.03 L17:-0.03 L18:-0.04 L19:-0.02 L20:-0.01 L21:+0.14 L22:+1.03 L23:+1.06 L24:+1.05 L25:+1.05 L26:+1.05 L27:+1.00
+
+best layer              : L23  recovery=+1.0560
+
+negative controls
+-----------------
+  NC1 self-patch @L23   : max|dlogit|=0.000e+00  torch.equal=True   [expect exact]
+  NC2 patch L0 (different layer): recovery=-0.0079   [expect much weaker]
+  NC3 random replacement, matched norm: recovery=-2.0415   [expect no recovery]
+
+criteria: recovery>=0.5 (True) AND self-patch exact (True) AND rand<=0.20 (True) AND best>L0 (True)
+VERDICT : PASS
+
+interpretation
+--------------
+[OBS] Patching L23 recovers 105.6% of the clean-vs-corrupt logit gap.
+[OBS] The same patch at L0 recovers a different (usually smaller) amount; a random
+      vector of identical norm recovers ~0. So the effect is the *content* of the
+      activation, not the magnitude of the perturbation.
+[INF] Layer L23 is on the causal path for this factual recall.

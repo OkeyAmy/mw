@@ -1,0 +1,34 @@
+{
+ "layer": 8,
+ "randoms": 6,
+ "real": {
+  "target_eff": 5.701890182495117,
+  "ctrl_eff": 11.208306503295898,
+  "sign_consistency": 0.9,
+  "behav_delta": -0.1,
+  "behav_base": 0.1,
+  "behav_real": 0
+ },
+ "random": {
+  "target_eff_p95": 5.2505237579345705,
+  "target_eff_mean": 1.972738297780355,
+  "ctrl_eff_median": 7.589519405364991,
+  "sign_p95": 0.9,
+  "behav_delta_p95": 0.1,
+  "target_eff_all": [
+   0.8675455093383789,
+   -0.5894243240356445,
+   1.6296600341796874,
+   2.1459449768066405,
+   5.2505237579345705,
+   2.532179832458496
+  ]
+ },
+ "tests": {
+  "T1_selectivity": true,
+  "T2_collateral": false,
+  "T3_behaviour": false,
+  "T4_heldout_sign": false
+ },
+ "status": "FAIL"
+}

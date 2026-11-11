@@ -1,0 +1,38 @@
+C5 — MID-GENERATION STEERING (does the switch land at exactly one step?)
+========================================================================
+prompt        : 'def add(a, b):\n'
+layer / coef  : L8 / +2.0 (applied to the last position only)
+schedule      : coef=0 for steps 0..5, coef=+2.0 for steps 6..11
+decoding      : greedy (argmax), KV cache on
+
+step | max|logit delta| vs coef=0 run | base token | steered token
+-----+-------------------------------+------------+--------------
+   0 |                     0.000e+00 | '   '      | '   '     
+   1 |                     0.000e+00 | ' print'   | ' print'  
+   2 |                     0.000e+00 | '(f'       | '(f'      
+   3 |                     0.000e+00 | '"'        | '"'       
+   4 |                     0.000e+00 | 'ADDING'   | 'ADDING'  
+   5 |                     0.000e+00 | ' {'       | ' {'      
+   6 |                     1.072e+01 | 'a'        | 'a'       
+   7 |                     1.719e+01 | '}'        | ' {'      
+   8 |                     2.194e+01 | ' +'       | 'a'       
+   9 |                     1.647e+01 | ' {'       | ' a'      
+  10 |                     1.552e+01 | 'b'        | ' {'      
+  11 |                     2.519e+01 | '}")\n'    | 'a'       
+
+identical for steps 0..5 (bit-exact) : True
+changed from step 6 onward              : True
+first step where the greedy TOKEN differs  : 7
+VERDICT : PASS
+
+baseline text : '    print(f"ADDING {a} + {b}")\n'
+steered text  : '    print(f"ADDING {a {a a {a'
+
+interpretation
+--------------
+[OBS] The first 6 steps are bit-identical to the unsteered run: a zero coefficient is
+      a true no-op inside the live loop, not just in a one-shot forward pass.
+[OBS] The forward pass at step 6 already differs, so the intervention takes effect on
+      the token it is meant to affect, not one token later.
+[INF] Steering is a per-token intervention on a fresh forward pass (CONTEXT D5).
+[OBS] The greedy token did not actually flip until step 7: the logits moved at step 6 but not enough to change the argmax. Logit movement and visible behaviour change are different thresholds — report both.

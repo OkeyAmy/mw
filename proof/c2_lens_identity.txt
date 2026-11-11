@@ -1,0 +1,30 @@
+C2 — LOGIT LENS IDENTITY
+========================================================================
+model            : Qwen/Qwen2.5-Coder-1.5B
+prompt           : 'def add(a, b):\n    return a + b\n'
+tokens           : 12
+dtype            : torch.float32
+tie_word_embeddings: True
+lm_head          : Linear in=1536 out=151936 bias=False
+final norm       : Qwen2RMSNorm eps=1e-06
+
+identity tested:  logits  ==  lm_head( model.model.norm( resid_post(27) ) )
+compared over ALL 12 positions x 151936 vocab entries.
+
+diagnostic ladder (max |diff| vs model's own logits):
+  0.000000e+00   lm_head(norm(resid_post_27))  <-- EXPECTED EXACT
+  3.447938e+01   lm_head(resid_post_27)  [no norm]
+  1.931534e+01   lm_head(norm(norm(resid_post_27)))  [2x norm]
+  2.182556e+01   lm_head(norm(resid_post_26))  [off by one]
+
+best-matching variant : lm_head(norm(resid_post_27))
+max_abs_diff          : 0.000000e+00
+last-position diff    : 0.000000e+00
+threshold             : 1e-4
+VERDICT               : PASS
+
+[OBS] The lens is exact at the final layer. Every logit-lens readout at
+      layer 27 is bit-comparable to the model's real output. C3..C6 are
+      interpretable. Lower layers remain an *approximation* (they are
+      projected through a norm trained for layer 27) — that is the known,
+      documented limit of the logit lens, not a bug.

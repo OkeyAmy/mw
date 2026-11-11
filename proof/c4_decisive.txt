@@ -1,0 +1,16 @@
+C4 DECISIVE TEST — is the steering vector special?
+==============================================================
+layer 8 | 16 train pairs | 10 held-out prompts | 6 random controls
+
+metric                            real      random ref    pass
+T1 target effect                 5.702           5.251    True
+T2 control effect               11.208           7.590   False
+T3 behaviour delta              -0.100           0.100   False
+T4 sign consistency               0.90            0.90   False
+
+baseline comment lines per completion: 0.10
+with real vector                     : 0.00
+
+VERDICT: FAIL — steering is not distinguishable from noise
+
+If this fails, the product cannot be 'control'. It must be measurement.

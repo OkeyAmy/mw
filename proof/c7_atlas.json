@@ -1,0 +1,1162 @@
+{
+ "model": "/home/okey/Desktop/Projects/mod_wei/.hf/q4km-hf",
+ "tokens_seen": 5888,
+ "duration_s": 122.4,
+ "tok_per_s": 48.12,
+ "layers": 28,
+ "intermediate_size": 8960,
+ "total_neurons": 250880,
+ "covered_neurons": 250863,
+ "coverage": 0.9999,
+ "dead_neurons": 17,
+ "per_layer": [
+  {
+   "layer": 0,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.499151,
+   "max_fire_rate": 0.959239,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 7266,
+     "fire_rate": 0.95924,
+     "max_act": 0.647,
+     "max_token": ".rstrip"
+    },
+    {
+     "neuron": 3595,
+     "fire_rate": 0.94209,
+     "max_act": 0.666,
+     "max_token": "_EVENTS"
+    },
+    {
+     "neuron": 3073,
+     "fire_rate": 0.9358,
+     "max_act": 0.463,
+     "max_token": " flags"
+    },
+    {
+     "neuron": 8268,
+     "fire_rate": 0.87534,
+     "max_act": 0.622,
+     "max_token": " Abstract"
+    },
+    {
+     "neuron": 310,
+     "fire_rate": 0.85309,
+     "max_act": 0.593,
+     "max_token": ".rstrip"
+    }
+   ]
+  },
+  {
+   "layer": 1,
+   "covered": 8953,
+   "total_neurons": 8960,
+   "coverage": 0.9992,
+   "median_fire_rate": 0.499321,
+   "max_fire_rate": 1.0,
+   "dead_neurons": 7,
+   "top5_neurons": [
+    {
+     "neuron": 23,
+     "fire_rate": 1.0,
+     "max_act": 1.332,
+     "max_token": " doesn"
+    },
+    {
+     "neuron": 736,
+     "fire_rate": 1.0,
+     "max_act": 6.904,
+     "max_token": " os"
+    },
+    {
+     "neuron": 1362,
+     "fire_rate": 1.0,
+     "max_act": 0.908,
+     "max_token": "otify"
+    },
+    {
+     "neuron": 2247,
+     "fire_rate": 1.0,
+     "max_act": 2.511,
+     "max_token": "c"
+    },
+    {
+     "neuron": 932,
+     "fire_rate": 1.0,
+     "max_act": 0.419,
+     "max_token": "cookie"
+    }
+   ]
+  },
+  {
+   "layer": 2,
+   "covered": 8957,
+   "total_neurons": 8960,
+   "coverage": 0.9997,
+   "median_fire_rate": 0.501359,
+   "max_fire_rate": 1.0,
+   "dead_neurons": 3,
+   "top5_neurons": [
+    {
+     "neuron": 3238,
+     "fire_rate": 1.0,
+     "max_act": 1.163,
+     "max_token": " in"
+    },
+    {
+     "neuron": 8094,
+     "fire_rate": 0.99983,
+     "max_act": 1.38,
+     "max_token": "Manager"
+    },
+    {
+     "neuron": 4368,
+     "fire_rate": 0.99949,
+     "max_act": 0.721,
+     "max_token": "SError"
+    },
+    {
+     "neuron": 2417,
+     "fire_rate": 0.99932,
+     "max_act": 26.424,
+     "max_token": " "
+    },
+    {
+     "neuron": 7069,
+     "fire_rate": 0.99932,
+     "max_act": 0.862,
+     "max_token": " wd"
+    }
+   ]
+  },
+  {
+   "layer": 3,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.49949,
+   "max_fire_rate": 1.0,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 6922,
+     "fire_rate": 1.0,
+     "max_act": 2.859,
+     "max_token": "ien"
+    },
+    {
+     "neuron": 2922,
+     "fire_rate": 0.99983,
+     "max_act": 1.116,
+     "max_token": "in"
+    },
+    {
+     "neuron": 5695,
+     "fire_rate": 0.99762,
+     "max_act": 0.763,
+     "max_token": " these"
+    },
+    {
+     "neuron": 8647,
+     "fire_rate": 0.99626,
+     "max_act": 1.087,
+     "max_token": " as"
+    },
+    {
+     "neuron": 4700,
+     "fire_rate": 0.99524,
+     "max_act": 1.155,
+     "max_token": "\n"
+    }
+   ]
+  },
+  {
+   "layer": 4,
+   "covered": 8957,
+   "total_neurons": 8960,
+   "coverage": 0.9997,
+   "median_fire_rate": 0.501529,
+   "max_fire_rate": 1.0,
+   "dead_neurons": 3,
+   "top5_neurons": [
+    {
+     "neuron": 6333,
+     "fire_rate": 1.0,
+     "max_act": 1.86,
+     "max_token": " /"
+    },
+    {
+     "neuron": 949,
+     "fire_rate": 1.0,
+     "max_act": 1.43,
+     "max_token": " have"
+    },
+    {
+     "neuron": 7304,
+     "fire_rate": 1.0,
+     "max_act": 1.217,
+     "max_token": "ini"
+    },
+    {
+     "neuron": 8519,
+     "fire_rate": 1.0,
+     "max_act": 1.461,
+     "max_token": "r"
+    },
+    {
+     "neuron": 2773,
+     "fire_rate": 1.0,
+     "max_act": 2.181,
+     "max_token": "otify"
+    }
+   ]
+  },
+  {
+   "layer": 5,
+   "covered": 8958,
+   "total_neurons": 8960,
+   "coverage": 0.9998,
+   "median_fire_rate": 0.498471,
+   "max_fire_rate": 1.0,
+   "dead_neurons": 2,
+   "top5_neurons": [
+    {
+     "neuron": 3607,
+     "fire_rate": 1.0,
+     "max_act": 3.87,
+     "max_token": " "
+    },
+    {
+     "neuron": 5002,
+     "fire_rate": 1.0,
+     "max_act": 1.032,
+     "max_token": "name"
+    },
+    {
+     "neuron": 4580,
+     "fire_rate": 1.0,
+     "max_act": 2.112,
+     "max_token": "bast"
+    },
+    {
+     "neuron": 7492,
+     "fire_rate": 0.99932,
+     "max_act": 1.341,
+     "max_token": "_que"
+    },
+    {
+     "neuron": 514,
+     "fire_rate": 0.99932,
+     "max_act": 1.111,
+     "max_token": " Self"
+    }
+   ]
+  },
+  {
+   "layer": 6,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.5,
+   "max_fire_rate": 0.999151,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 1265,
+     "fire_rate": 0.99915,
+     "max_act": 0.946,
+     "max_token": "     "
+    },
+    {
+     "neuron": 6261,
+     "fire_rate": 0.99711,
+     "max_act": 1.101,
+     "max_token": "__("
+    },
+    {
+     "neuron": 378,
+     "fire_rate": 0.98624,
+     "max_act": 0.767,
+     "max_token": " occurred"
+    },
+    {
+     "neuron": 3985,
+     "fire_rate": 0.98336,
+     "max_act": 0.753,
+     "max_token": " ("
+    },
+    {
+     "neuron": 6825,
+     "fire_rate": 0.97894,
+     "max_act": 0.721,
+     "max_token": "ien"
+    }
+   ]
+  },
+  {
+   "layer": 7,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.498981,
+   "max_fire_rate": 0.982337,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 3771,
+     "fire_rate": 0.98234,
+     "max_act": 0.73,
+     "max_token": " Sebast"
+    },
+    {
+     "neuron": 8549,
+     "fire_rate": 0.96365,
+     "max_act": 0.561,
+     "max_token": " at"
+    },
+    {
+     "neuron": 5163,
+     "fire_rate": 0.95329,
+     "max_act": 2.264,
+     "max_token": " ctypes"
+    },
+    {
+     "neuron": 5049,
+     "fire_rate": 0.9409,
+     "max_act": 1.794,
+     "max_token": "'"
+    },
+    {
+     "neuron": 8010,
+     "fire_rate": 0.93597,
+     "max_act": 0.702,
+     "max_token": "ini"
+    }
+   ]
+  },
+  {
+   "layer": 8,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.50034,
+   "max_fire_rate": 0.980808,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 2481,
+     "fire_rate": 0.98081,
+     "max_act": 0.645,
+     "max_token": "0"
+    },
+    {
+     "neuron": 3403,
+     "fire_rate": 0.93003,
+     "max_act": 0.922,
+     "max_token": "otify"
+    },
+    {
+     "neuron": 7393,
+     "fire_rate": 0.91967,
+     "max_act": 0.837,
+     "max_token": "code"
+    },
+    {
+     "neuron": 2331,
+     "fire_rate": 0.89436,
+     "max_act": 0.763,
+     "max_token": "()\n"
+    },
+    {
+     "neuron": 6474,
+     "fire_rate": 0.88944,
+     "max_act": 0.649,
+     "max_token": "   "
+    }
+   ]
+  },
+  {
+   "layer": 9,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.498811,
+   "max_fire_rate": 0.93699,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 97,
+     "fire_rate": 0.93699,
+     "max_act": 0.399,
+     "max_token": " ("
+    },
+    {
+     "neuron": 3665,
+     "fire_rate": 0.92357,
+     "max_act": 3.154,
+     "max_token": ","
+    },
+    {
+     "neuron": 4225,
+     "fire_rate": 0.89283,
+     "max_act": 1.965,
+     "max_token": ")\"\n\n"
+    },
+    {
+     "neuron": 5105,
+     "fire_rate": 0.88723,
+     "max_act": 4.025,
+     "max_token": "('"
+    },
+    {
+     "neuron": 6580,
+     "fire_rate": 0.86804,
+     "max_act": 0.687,
+     "max_token": "           "
+    }
+   ]
+  },
+  {
+   "layer": 10,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.502378,
+   "max_fire_rate": 0.998811,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 6193,
+     "fire_rate": 0.99881,
+     "max_act": 0.781,
+     "max_token": "back"
+    },
+    {
+     "neuron": 6140,
+     "fire_rate": 0.97113,
+     "max_act": 2.084,
+     "max_token": " of"
+    },
+    {
+     "neuron": 8925,
+     "fire_rate": 0.93954,
+     "max_act": 1.005,
+     "max_token": "\n\n\n"
+    },
+    {
+     "neuron": 2678,
+     "fire_rate": 0.93478,
+     "max_act": 0.61,
+     "max_token": " that"
+    },
+    {
+     "neuron": 8058,
+     "fire_rate": 0.92357,
+     "max_act": 2.26,
+     "max_token": ")"
+    }
+   ]
+  },
+  {
+   "layer": 11,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.501529,
+   "max_fire_rate": 0.999321,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 2579,
+     "fire_rate": 0.99932,
+     "max_act": 0.786,
+     "max_token": " requires"
+    },
+    {
+     "neuron": 589,
+     "fire_rate": 0.99796,
+     "max_act": 0.742,
+     "max_token": "2"
+    },
+    {
+     "neuron": 3014,
+     "fire_rate": 0.99728,
+     "max_act": 0.874,
+     "max_token": "\n\n"
+    },
+    {
+     "neuron": 7142,
+     "fire_rate": 0.98658,
+     "max_act": 0.717,
+     "max_token": "'"
+    },
+    {
+     "neuron": 5813,
+     "fire_rate": 0.982,
+     "max_act": 0.656,
+     "max_token": " this"
+    }
+   ]
+  },
+  {
+   "layer": 12,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.499151,
+   "max_fire_rate": 0.961957,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 8328,
+     "fire_rate": 0.96196,
+     "max_act": 1.173,
+     "max_token": ","
+    },
+    {
+     "neuron": 1456,
+     "fire_rate": 0.94192,
+     "max_act": 0.961,
+     "max_token": " files"
+    },
+    {
+     "neuron": 398,
+     "fire_rate": 0.93563,
+     "max_act": 1.853,
+     "max_token": "calls"
+    },
+    {
+     "neuron": 5939,
+     "fire_rate": 0.91899,
+     "max_act": 0.53,
+     "max_token": " to"
+    },
+    {
+     "neuron": 4212,
+     "fire_rate": 0.91508,
+     "max_act": 0.942,
+     "max_token": " masks"
+    }
+   ]
+  },
+  {
+   "layer": 13,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.500679,
+   "max_fire_rate": 0.982507,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 561,
+     "fire_rate": 0.98251,
+     "max_act": 1.222,
+     "max_token": " in"
+    },
+    {
+     "neuron": 4199,
+     "fire_rate": 0.96399,
+     "max_act": 2.012,
+     "max_token": " shall"
+    },
+    {
+     "neuron": 372,
+     "fire_rate": 0.9431,
+     "max_act": 0.738,
+     "max_token": "Software"
+    },
+    {
+     "neuron": 3287,
+     "fire_rate": 0.91219,
+     "max_act": 1.452,
+     "max_token": "ritable"
+    },
+    {
+     "neuron": 6968,
+     "fire_rate": 0.90353,
+     "max_act": 0.537,
+     "max_token": ","
+    }
+   ]
+  },
+  {
+   "layer": 14,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.50034,
+   "max_fire_rate": 0.856488,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 789,
+     "fire_rate": 0.85649,
+     "max_act": 4.335,
+     "max_token": " datetime"
+    },
+    {
+     "neuron": 5597,
+     "fire_rate": 0.84901,
+     "max_act": 1.43,
+     "max_token": " source"
+    },
+    {
+     "neuron": 3967,
+     "fire_rate": 0.84528,
+     "max_act": 6.839,
+     "max_token": " object"
+    },
+    {
+     "neuron": 6152,
+     "fire_rate": 0.84052,
+     "max_act": 0.947,
+     "max_token": " the"
+    },
+    {
+     "neuron": 7627,
+     "fire_rate": 0.82388,
+     "max_act": 1.991,
+     "max_token": " se"
+    }
+   ]
+  },
+  {
+   "layer": 15,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.49949,
+   "max_fire_rate": 0.984545,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 2139,
+     "fire_rate": 0.98454,
+     "max_act": 0.626,
+     "max_token": "       "
+    },
+    {
+     "neuron": 7276,
+     "fire_rate": 0.96722,
+     "max_act": 1.341,
+     "max_token": "/python"
+    },
+    {
+     "neuron": 1449,
+     "fire_rate": 0.9645,
+     "max_act": 0.681,
+     "max_token": "   "
+    },
+    {
+     "neuron": 7359,
+     "fire_rate": 0.95924,
+     "max_act": 1.366,
+     "max_token": "call"
+    },
+    {
+     "neuron": 6531,
+     "fire_rate": 0.95737,
+     "max_act": 0.583,
+     "max_token": "otify"
+    }
+   ]
+  },
+  {
+   "layer": 16,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.498981,
+   "max_fire_rate": 0.953465,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 8484,
+     "fire_rate": 0.95346,
+     "max_act": 3.507,
+     "max_token": " The"
+    },
+    {
+     "neuron": 2348,
+     "fire_rate": 0.92306,
+     "max_act": 3.965,
+     "max_token": "#"
+    },
+    {
+     "neuron": 5522,
+     "fire_rate": 0.9037,
+     "max_act": 0.536,
+     "max_token": ","
+    },
+    {
+     "neuron": 4315,
+     "fire_rate": 0.88825,
+     "max_act": 1.209,
+     "max_token": " IS"
+    },
+    {
+     "neuron": 6337,
+     "fire_rate": 0.8733,
+     "max_act": 1.547,
+     "max_token": " is"
+    }
+   ]
+  },
+  {
+   "layer": 17,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.500679,
+   "max_fire_rate": 0.983696,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 1249,
+     "fire_rate": 0.9837,
+     "max_act": 0.705,
+     "max_token": " have"
+    },
+    {
+     "neuron": 1495,
+     "fire_rate": 0.98353,
+     "max_act": 0.865,
+     "max_token": " strings"
+    },
+    {
+     "neuron": 3590,
+     "fire_rate": 0.98217,
+     "max_act": 0.824,
+     "max_token": "ini"
+    },
+    {
+     "neuron": 3356,
+     "fire_rate": 0.97843,
+     "max_act": 0.85,
+     "max_token": "type"
+    },
+    {
+     "neuron": 6995,
+     "fire_rate": 0.97826,
+     "max_act": 0.794,
+     "max_token": " prior"
+    }
+   ]
+  },
+  {
+   "layer": 18,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.500849,
+   "max_fire_rate": 0.992527,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 737,
+     "fire_rate": 0.99253,
+     "max_act": 1.153,
+     "max_token": "_sys"
+    },
+    {
+     "neuron": 3111,
+     "fire_rate": 0.98013,
+     "max_act": 0.873,
+     "max_token": " needed"
+    },
+    {
+     "neuron": 2745,
+     "fire_rate": 0.97979,
+     "max_act": 2.165,
+     "max_token": ").\n"
+    },
+    {
+     "neuron": 4795,
+     "fire_rate": 0.97232,
+     "max_act": 3.482,
+     "max_token": " OF"
+    },
+    {
+     "neuron": 883,
+     "fire_rate": 0.95754,
+     "max_act": 1.816,
+     "max_token": "ib"
+    }
+   ]
+  },
+  {
+   "layer": 19,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.50051,
+   "max_fire_rate": 0.996433,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 2318,
+     "fire_rate": 0.99643,
+     "max_act": 0.782,
+     "max_token": "'t"
+    },
+    {
+     "neuron": 1665,
+     "fire_rate": 0.99541,
+     "max_act": 0.872,
+     "max_token": " variable"
+    },
+    {
+     "neuron": 8555,
+     "fire_rate": 0.99457,
+     "max_act": 0.933,
+     "max_token": " FLAG"
+    },
+    {
+     "neuron": 5358,
+     "fire_rate": 0.99338,
+     "max_act": 0.86,
+     "max_token": " if"
+    },
+    {
+     "neuron": 6273,
+     "fire_rate": 0.99168,
+     "max_act": 1.505,
+     "max_token": " #"
+    }
+   ]
+  },
+  {
+   "layer": 20,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.497962,
+   "max_fire_rate": 0.97962,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 2616,
+     "fire_rate": 0.97962,
+     "max_act": 1.318,
+     "max_token": " dispatch"
+    },
+    {
+     "neuron": 509,
+     "fire_rate": 0.97181,
+     "max_act": 6.285,
+     "max_token": " users"
+    },
+    {
+     "neuron": 6994,
+     "fire_rate": 0.96179,
+     "max_act": 0.799,
+     "max_token": " on"
+    },
+    {
+     "neuron": 1114,
+     "fire_rate": 0.93988,
+     "max_act": 0.943,
+     "max_token": " raw"
+    },
+    {
+     "neuron": 7574,
+     "fire_rate": 0.93699,
+     "max_act": 1.229,
+     "max_token": " '"
+    }
+   ]
+  },
+  {
+   "layer": 21,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.498471,
+   "max_fire_rate": 0.994735,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 8173,
+     "fire_rate": 0.99474,
+     "max_act": 1.465,
+     "max_token": "Error"
+    },
+    {
+     "neuron": 4769,
+     "fire_rate": 0.99168,
+     "max_act": 1.39,
+     "max_token": "exclude"
+    },
+    {
+     "neuron": 2048,
+     "fire_rate": 0.99032,
+     "max_act": 0.815,
+     "max_token": "\n\n\n"
+    },
+    {
+     "neuron": 5795,
+     "fire_rate": 0.98353,
+     "max_act": 0.79,
+     "max_token": "M"
+    },
+    {
+     "neuron": 4801,
+     "fire_rate": 0.98302,
+     "max_act": 1.181,
+     "max_token": "IN"
+    }
+   ]
+  },
+  {
+   "layer": 22,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.498981,
+   "max_fire_rate": 0.99949,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 7803,
+     "fire_rate": 0.99949,
+     "max_act": 1.02,
+     "max_token": "Se"
+    },
+    {
+     "neuron": 8407,
+     "fire_rate": 0.99779,
+     "max_act": 1.306,
+     "max_token": "z"
+    },
+    {
+     "neuron": 2643,
+     "fire_rate": 0.99711,
+     "max_act": 1.287,
+     "max_token": " def"
+    },
+    {
+     "neuron": 906,
+     "fire_rate": 0.99677,
+     "max_act": 1.517,
+     "max_token": ":\n"
+    },
+    {
+     "neuron": 8863,
+     "fire_rate": 0.9966,
+     "max_act": 1.217,
+     "max_token": "VED"
+    }
+   ]
+  },
+  {
+   "layer": 23,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.497622,
+   "max_fire_rate": 0.997113,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 735,
+     "fire_rate": 0.99711,
+     "max_act": 2.126,
+     "max_token": ".p"
+    },
+    {
+     "neuron": 5941,
+     "fire_rate": 0.99321,
+     "max_act": 2.255,
+     "max_token": " Y"
+    },
+    {
+     "neuron": 5231,
+     "fire_rate": 0.99304,
+     "max_act": 1.578,
+     "max_token": " value"
+    },
+    {
+     "neuron": 3241,
+     "fire_rate": 0.99151,
+     "max_act": 1.441,
+     "max_token": " /"
+    },
+    {
+     "neuron": 6093,
+     "fire_rate": 0.98879,
+     "max_act": 0.886,
+     "max_token": "#"
+    }
+   ]
+  },
+  {
+   "layer": 24,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.502038,
+   "max_fire_rate": 0.998981,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 4567,
+     "fire_rate": 0.99898,
+     "max_act": 1.641,
+     "max_token": "ini"
+    },
+    {
+     "neuron": 8537,
+     "fire_rate": 0.99864,
+     "max_act": 1.358,
+     "max_token": "/t"
+    },
+    {
+     "neuron": 5768,
+     "fire_rate": 0.99728,
+     "max_act": 1.389,
+     "max_token": "cret"
+    },
+    {
+     "neuron": 4510,
+     "fire_rate": 0.99253,
+     "max_act": 1.079,
+     "max_token": "(seq"
+    },
+    {
+     "neuron": 3097,
+     "fire_rate": 0.98845,
+     "max_act": 5.774,
+     "max_token": " <"
+    }
+   ]
+  },
+  {
+   "layer": 25,
+   "covered": 8960,
+   "total_neurons": 8960,
+   "coverage": 1.0,
+   "median_fire_rate": 0.49983,
+   "max_fire_rate": 0.998641,
+   "dead_neurons": 0,
+   "top5_neurons": [
+    {
+     "neuron": 2648,
+     "fire_rate": 0.99864,
+     "max_act": 2.309,
+     "max_token": " FROM"
+    },
+    {
+     "neuron": 5178,
+     "fire_rate": 0.99813,
+     "max_act": 1.775,
+     "max_token": ","
+    },
+    {
+     "neuron": 1746,
+     "fire_rate": 0.99796,
+     "max_act": 1.982,
+     "max_token": " OR"
+    },
+    {
+     "neuron": 7533,
+     "fire_rate": 0.98777,
+     "max_act": 1.759,
+     "max_token": "}\n"
+    },
+    {
+     "neuron": 4233,
+     "fire_rate": 0.98421,
+     "max_act": 1.567,
+     "max_token": " -"
+    }
+   ]
+  },
+  {
+   "layer": 26,
+   "covered": 8959,
+   "total_neurons": 8960,
+   "coverage": 0.9999,
+   "median_fire_rate": 0.49949,
+   "max_fire_rate": 0.998811,
+   "dead_neurons": 1,
+   "top5_neurons": [
+    {
+     "neuron": 7078,
+     "fire_rate": 0.99881,
+     "max_act": 1.998,
+     "max_token": " '"
+    },
+    {
+     "neuron": 8706,
+     "fire_rate": 0.99711,
+     "max_act": 14.658,
+     "max_token": " closed"
+    },
+    {
+     "neuron": 7831,
+     "fire_rate": 0.99236,
+     "max_act": 1.668,
+     "max_token": "1"
+    },
+    {
+     "neuron": 1932,
+     "fire_rate": 0.98811,
+     "max_act": 1.255,
+     "max_token": ","
+    },
+    {
+     "neuron": 8659,
+     "fire_rate": 0.98488,
+     "max_act": 2.172,
+     "max_token": " following"
+    }
+   ]
+  },
+  {
+   "layer": 27,
+   "covered": 8959,
+   "total_neurons": 8960,
+   "coverage": 0.9999,
+   "median_fire_rate": 0.5,
+   "max_fire_rate": 1.0,
+   "dead_neurons": 1,
+   "top5_neurons": [
+    {
+     "neuron": 8741,
+     "fire_rate": 1.0,
+     "max_act": 1.519,
+     "max_token": "#"
+    },
+    {
+     "neuron": 5434,
+     "fire_rate": 0.99966,
+     "max_act": 4.076,
+     "max_token": ",\n"
+    },
+    {
+     "neuron": 4323,
+     "fire_rate": 0.99898,
+     "max_act": 1.798,
+     "max_token": "1"
+    },
+    {
+     "neuron": 3364,
+     "fire_rate": 0.99898,
+     "max_act": 1.747,
+     "max_token": "Formatter"
+    },
+    {
+     "neuron": 3176,
+     "fire_rate": 0.99898,
+     "max_act": 1.529,
+     "max_token": " list"
+    }
+   ]
+  }
+ ]
+}

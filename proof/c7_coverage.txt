@@ -1,0 +1,40 @@
+C7 — NEURON ATLAS COVERAGE
+============================================================
+model      : /home/okey/Desktop/Projects/mod_wei/.hf/q4km-hf
+tokens seen: 5888  (122s, 48.1 tok/s)
+neurons    : 250880 total (28 layers x 8960)
+covered    : 250863 (99.99%)
+never fired: 17 (0.01%)
+
+  L 0 cov=100.0%  dead=   0  median_rate=0.4992
+  L 1 cov= 99.9%  dead=   7  median_rate=0.4993
+  L 2 cov=100.0%  dead=   3  median_rate=0.5014
+  L 3 cov=100.0%  dead=   0  median_rate=0.4995
+  L 4 cov=100.0%  dead=   3  median_rate=0.5015
+  L 5 cov=100.0%  dead=   2  median_rate=0.4985
+  L 6 cov=100.0%  dead=   0  median_rate=0.5000
+  L 7 cov=100.0%  dead=   0  median_rate=0.4990
+  L 8 cov=100.0%  dead=   0  median_rate=0.5003
+  L 9 cov=100.0%  dead=   0  median_rate=0.4988
+  L10 cov=100.0%  dead=   0  median_rate=0.5024
+  L11 cov=100.0%  dead=   0  median_rate=0.5015
+  L12 cov=100.0%  dead=   0  median_rate=0.4992
+  L13 cov=100.0%  dead=   0  median_rate=0.5007
+  L14 cov=100.0%  dead=   0  median_rate=0.5003
+  L15 cov=100.0%  dead=   0  median_rate=0.4995
+  L16 cov=100.0%  dead=   0  median_rate=0.4990
+  L17 cov=100.0%  dead=   0  median_rate=0.5007
+  L18 cov=100.0%  dead=   0  median_rate=0.5008
+  L19 cov=100.0%  dead=   0  median_rate=0.5005
+  L20 cov=100.0%  dead=   0  median_rate=0.4980
+  L21 cov=100.0%  dead=   0  median_rate=0.4985
+  L22 cov=100.0%  dead=   0  median_rate=0.4990
+  L23 cov=100.0%  dead=   0  median_rate=0.4976
+  L24 cov=100.0%  dead=   0  median_rate=0.5020
+  L25 cov=100.0%  dead=   0  median_rate=0.4998
+  L26 cov=100.0%  dead=   1  median_rate=0.4995
+  L27 cov=100.0%  dead=   1  median_rate=0.5000
+
+NOTE: coverage is corpus-dependent. More tokens and diverse code
+      raise it; these numbers describe THIS corpus, not the model.
+

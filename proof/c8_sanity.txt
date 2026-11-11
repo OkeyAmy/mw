@@ -1,0 +1,19 @@
+C8 — SANITY GATE
+============================================================
+model: /home/okey/Desktop/Projects/mod_wei/.hf/q4km-hf
+dtype: torch.float32
+
+  [ok] determinism_bitidentical               same input twice
+  [ok] lens_identity_at_final_layer           max|diff|=2.00e-05
+  [ok] steer_coef0_bitidentical               torch.equal
+  [ok] self_patch_noop                        torch.equal
+  [ok] attention_rows_sum_to_1                max|sum-1|=1.19e-07
+  [ok] all_captured_tensors_finite            28 layers
+  [ok] tokenizer_roundtrip                    decode(encode(x))==x
+  [ok] model_in_eval_mode                     training=False
+  [ok] wrong_vector_changes_output            max|diff|=3.87e+00
+  [ok] capture_shapes                         28 x [1,1536]
+
+passed 10/10
+VERDICT: PASS
+

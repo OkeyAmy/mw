@@ -1,0 +1,16 @@
+SELFTEST — harness plumbing on a randomly initialised Qwen2
+========================================================================
+model: 3 layers, d=32, vocab=64, fp32, eager, threads=4
+
+  [ok] capture_all_layers: 3 layers, shapes ok
+  [ok] lens_identity_exact: max|diff|=0.000e+00
+  [ok] patch_self_is_noop: torch.equal=True
+  [ok] patch_changes_output: max|diff|=6.577e-01
+  [ok] steer_zero_bitidentical: inert=True arith=True
+  [ok] steer_nonzero_moves: max|diff|=2.263e-01
+  [ok] midgen_switch_exact: deltas=0.0e+00,0.0e+00,0.0e+00,3.5e-01,5.6e-01,5.5e-01
+  [ok] logit_bias_forces: tokens=[5, 5, 5]
+
+No model weights and no real tokenizer are involved. This tests the
+hooks, the norm/lm_head path, patch/steer semantics and the decode loop.
+If these pass, a real-model C2 failure is dtype or hook-site, not plumbing.
