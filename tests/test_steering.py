@@ -20,13 +20,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "code"))
 
-from app.server import (  # noqa: E402
+from mw.adapter import DEFAULT_NEG, DEFAULT_POS, ModelAdapter
+
+from app.server import (
     STEER_MIN_COEF,
     GenControl,
     LiveAdapter,
     SteerState,
 )
-from mw.adapter import ModelAdapter  # noqa: E402
 
 VOCAB = 512
 EOS = 0
@@ -104,7 +105,6 @@ def test_vector_is_not_a_last_token_embedding_delta(ad, vecs):
     """H3-3 regression: the estimator averages all positions, so at layer 0 the
     vector must NOT be collinear with the last-token embedding difference."""
     emb = ad.model.model.embed_tokens.weight.detach().float()
-    from mw.adapter import DEFAULT_NEG, DEFAULT_POS
     pos = torch.stack([ad.tok(t).input_ids[0, -1] for t in DEFAULT_POS])
     neg = torch.stack([ad.tok(t).input_ids[0, -1] for t in DEFAULT_NEG])
     ident = emb[pos].mean(0) - emb[neg].mean(0)
@@ -120,6 +120,31 @@ def test_coef_zero_is_bit_identical(ad, ids, vecs):
         assert torch.equal(base, _logits(ad, ids)), (
             f"coef=0 changed the logits (layer={layer})")
     ad.set_steer(None, None, 0.0)
+
+
+def test_vector_unit_is_one_residual_norm(ad, vecs):
+    """PROTOCOL: one coef unit = the layer's residual norm.
+
+    `build_steer_vectors` normalises to ‖mean_t h‖ (uncentred, all positions),
+    which on a real model is inflated 14-42x at mid layers relative to the
+    position actually steered. `residual_scale` + `calibrate_vectors` restore
+    the documented unit at the last position; the direction must not change.
+    """
+    import app.server as srv
+
+    batch = ad.format_messages([{"role": "user", "content": DEFAULT_NEG[0]}])
+    scale = srv.residual_scale(ad, [batch])
+    assert scale, "no per-token residual scale measured"
+    cal = srv.calibrate_vectors(vecs, scale)
+    assert set(cal) == set(scale) & set(vecs)
+    for l, v in cal.items():
+        assert float(v.norm()) == pytest.approx(scale[l], rel=1e-4)
+        cos = float(torch.nn.functional.cosine_similarity(v, vecs[l], dim=0))
+        assert cos == pytest.approx(1.0, abs=1e-5), f"L{l} direction changed"
+    # idempotent: rescaling an already-calibrated vector changes nothing
+    again = srv.calibrate_vectors(cal, scale)
+    for l in cal:
+        assert torch.allclose(cal[l], again[l], atol=1e-6)
 
 
 # -- 3. coef != 0 must change the next-token distribution -------------------
@@ -211,6 +236,20 @@ def test_provenance_fields_are_per_token(ad):
     assert nframes[0]["steer_layer"] is None
 
 
+def test_neuron_only_frame_does_not_claim_a_vector_layer(ad):
+    """Live bug: a chat sent with `layer: 8, coef: 0` plus a neuron clamp at
+    L14 produced `steer_layer: 8, coef: 0.0` — a claim that a layer-8 vector was
+    applied when only the L14 neuron was written."""
+    state = SteerState()
+    state.set_base(1, 0.0)
+    state.neurons[(2, 7)] = 0.0
+    frame = _stream(ad, state, n=1)[0]
+    assert frame["steered"] is True
+    assert frame["steer_layer"] is None, frame
+    assert frame["coef"] == 0.0
+    assert frame["neuron_steer"] == {"2": {"7": 0.0}}
+
+
 def test_steering_changes_the_next_token_distribution(ad):
     """End-to-end through the live stream path: identical prompt, coef=0 vs
     coef=2 must change the per-step next-token distribution.
@@ -238,6 +277,7 @@ def test_two_connections_do_not_share_steering(ad):
 
     ad.apply_steering(a, vectors)
     assert ad._steer["layer"] == 2 and ad._steer["coef"] == 2.0
+    assert ad._steer["vec"] is not None and float(ad._steer["vec"].norm()) > 0.0
     assert a.steered() and not b.steered()
 
     # B's forward must not inherit A's vector.

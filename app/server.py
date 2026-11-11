@@ -37,7 +37,7 @@ import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
-from mw.adapter import ModelAdapter
+from mw.adapter import DEFAULT_NEG, DEFAULT_POS, ModelAdapter
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -284,11 +284,14 @@ class SteerState:
         self.layer = layer
         self.coef = coef
 
+    def base_active(self) -> bool:
+        """True when the activation vector itself is written this forward."""
+        return self.layer is not None and abs(self.coef) >= STEER_MIN_COEF
+
     def steered(self) -> bool:
         # Same threshold as apply_steering: provenance must describe what the
         # adapter actually wrote, not what the slider asked for.
-        return bool(self.neurons) or (
-            self.layer is not None and abs(self.coef) >= STEER_MIN_COEF)
+        return bool(self.neurons) or self.base_active()
 
     def neuron_payload(self) -> dict | None:
         if not self.neurons:
@@ -496,6 +499,54 @@ class SessionStore:
 
 
 # -- engine ------------------------------------------------------------------
+def residual_scale(adapter, batches) -> dict[int, float]:
+    """‖h‖ at resid_pre, per layer, at the LAST position — the coef unit.
+
+    Two things make this the honest unit, both measured on Granite 3.3 fp32:
+
+    1. The server steers `positions="last"` only, so the position whose norm
+       matters is the last one. `build_steer_vectors()` normalises to
+       ‖mean over positions of h‖ instead; at layers 9+ a single high-norm token
+       inside the prompt inflates that mean ~14x above the last-position norm
+       (73.8 vs 5.2 at L9), so `coef = 1` was a 14-residual-norm edit.
+    2. The prompts must be rendered the way generation renders them. A raw
+       un-templated code string has an even bigger inflation (405 vs 74 at L9,
+       77x the in-distribution value) — the same text as a chat turn is stable.
+
+    The returned number is the same quantity the token trace reports as
+    `layers[l].norm` (last position, resid_post), so a user can read the slider
+    unit straight off the panel.
+    """
+    prev = (adapter._capturing, adapter._capture_full)
+    acc: dict[int, list[float]] = {}
+    adapter._capturing, adapter._capture_full = True, True
+    try:
+        for ids in batches:
+            adapter._pre.clear()
+            adapter.model(input_ids=ids)
+            for l, h in adapter._pre.items():
+                row = h[0] if h.ndim == 3 else h   # [T, d] or [1, d]
+                acc.setdefault(l, []).append(float(row[-1].norm()))
+    finally:
+        adapter._capturing, adapter._capture_full = prev
+        adapter._pre.clear()
+    return {l: sum(v) / len(v) for l, v in acc.items() if v}
+
+
+def calibrate_vectors(vectors: dict, scale: dict) -> dict:
+    """Re-normalise each vector to one mean per-token residual norm.
+
+    Direction is untouched (`v / ‖v‖`), only the magnitude of one coef unit.
+    Idempotent: applying it twice gives the same vectors.
+    """
+    out: dict = {}
+    for l, v in vectors.items():
+        n = float(v.norm())
+        if l in scale and n > 0.0:
+            out[l] = v / n * float(scale[l])
+    return out
+
+
 class LiveAdapter(ModelAdapter):
     """The audited adapter plus the control the live server needs.
 
@@ -681,8 +732,12 @@ class LiveAdapter(ModelAdapter):
                 "token_id": nxt,
                 "ms": round((time.time() - t0) * 1000),
                 "steered": st.steered(),
-                "coef": round(float(st.coef), 4),
-                "steer_layer": st.layer if st.steered() else None,
+                "coef": round(float(st.coef), 4) if st.base_active() else 0.0,
+                # A neuron-only intervention has no layer vector: reporting the
+                # chat's `layer` here claimed a vector write that never happened
+                # (measured live: neuron L14 clamp arrived as `steer_layer: 8,
+                # coef: 0.0`).
+                "steer_layer": st.layer if st.base_active() else None,
                 "neuron_steer": st.neuron_payload(),
                 "topk": [[self.tok.decode([int(i)]).replace("\n", "\\n"),
                           round(float(p), 4)]
@@ -758,7 +813,15 @@ class Engine:
         # load() calls guard.require() and refuses BF16 -> float16.
         self.adapter = LiveAdapter(path).load(dtype=dtype)
         # H3-3: default contrast pairs, all token positions, same suffix.
-        self.vectors = self.adapter.build_steer_vectors()
+        built = self.adapter.build_steer_vectors()
+        # PROTOCOL: one coef unit = the layer's mean residual norm. Measure it on
+        # chat-rendered text (the format generation actually uses) and rescale:
+        # the estimator normalises to an uncentred positional mean built from raw
+        # text, which on Granite is up to 77x the in-distribution residual norm.
+        scale = residual_scale(self.adapter, [
+            self.adapter.format_messages([{"role": "user", "content": t}])
+            for t in (DEFAULT_POS[0], DEFAULT_NEG[0])])
+        self.vectors = calibrate_vectors(built, scale) or built
         # A present-but-all-zero vector accepts coef != 0 and changes nothing,
         # which is indistinguishable from "the slider is broken". Never offer
         # one: validation below rejects layers that are not in `usable`.
@@ -1297,6 +1360,9 @@ def main() -> int:
         print(f"[mw] steering: {len(ENGINE.usable)}/{len(ENGINE.vectors)} layers "
               f"usable | |v| min {norms[0]:.3f} median {norms[len(norms) // 2]:.3f} "
               f"max {norms[-1]:.3f} (coef 1 = one such vector)", flush=True)
+        print("[mw] steer |v| per layer: "
+              + " ".join(f"L{l}={float(v.norm()):.2f}"
+                         for l, v in sorted(ENGINE.usable.items())), flush=True)
     else:
         print("[mw] steering: NO usable vector — the slider cannot do anything; "
               "check build_steer_vectors()", flush=True)

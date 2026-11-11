@@ -87,6 +87,21 @@ insertion as a **user turn** through the model's chat template **does** change t
 continuation. The server therefore renders injections as turns; use
 `--no-chat-template` to disable.
 
+The first implementation appended a **whole rendered template**, which re-inserted
+the system preamble and reopened the assistant turn without closing the previous
+one — 67 tokens per injection. It now appends only the template diff (18 tokens):
+`<|end_of_text|>` + user turn + assistant prompt. Live check:
+injecting "What is the capital of Japan?" mid-stream yields
+`The capital of Japan is Tokyo, Japan.`
+
+**Steering units are calibrated.** `coef = 1` means *one residual norm* at that
+layer. The original vectors were normalised on raw text but applied to
+chat-formatted prompts, so a unit was 2.6 residual norms at L8 and 59 at L9 —
+most slider positions were 5–60× too strong. `residual_scale()` measures
+`||h_last||` per layer on chat-rendered text and `calibrate_vectors()` rescales
+direction-preserving. Live: the same prompt at L8 gives
+`coef 0 → "It seems like you"`, `+2 → "I'm sorry for"`, `−2 → "\n\nI'm"`.
+
 Injection also had a cache bug worth remembering: after forwarding the injected
 tokens, re-feeding the last one duplicates a token already in the KV cache and
 corrupts every later step. The loop now keeps the injection forward's logits
@@ -202,22 +217,29 @@ L8  norm=335.1   max cos = 0.0925
 L16 norm=338.5   max cos = 0.0920
 ```
 
-The conclusion did not change. At the best layer (L16, coef +2), against 20
-random vectors of matched norm:
+**The scale mattered more than the direction.** The first re-run used raw
+vectors of norm ~335 against a residual norm of ~5 — `coef=2` was a ~130×
+perturbation. S1 found the unit bug: vectors were normalised on raw text but
+applied to chat-formatted prompts, so one unit was 2.6 residual norms at L8 and
+**59 at L9**. After `residual_scale()`/`calibrate_vectors()`, `coef=1` means one
+residual norm, which is the regime the UI actually operates in.
+
+C4 re-run at that calibrated scale (L8, coef +1, 20 random controls):
 
 | test | result | numbers |
 |---|---|---|
-| T1 selectivity | **FAIL** | real target +4.56 vs random p95 **+9.45** |
-| T2 collateral | **PASS** | real control 1.79 vs random median 2.32 |
-| T4 held-out sign | **FAIL** | real 1.00, but random p95 is also 1.00 |
+| T1 selectivity | **FAIL** | real target **−0.38** vs random p95 **+1.12** |
+| T2 collateral | **FAIL** | real control 2.87 vs random median 2.28 |
+| T4 held-out sign | **FAIL** | real **0.10** — only 1 of 10 prompts moved the right way |
 
-So: random perturbations move the target logit *more* than our vector does, and
-many of them are equally consistent across held-out prompts. The one real signal
-is that our vector does **less collateral damage** than the median random
-vector — it is gentler, not stronger.
+At a realistic perturbation the vector does not just fail to beat random: it
+moves the target **slightly the wrong way** and is almost entirely inconsistent
+across held-out prompts. At 130× it produced +4.4 — that was **saturation**, not
+semantics. Every large perturbation moves logits; that is not steering.
 
-This is the honest status: **we cannot show that our steering vector does
-something a random direction cannot.** Control remains unestablished; measurement
+**Honest status: the steering slider changes output, but it is a perturbation
+knob, not semantic control.** Any coefficient changes the text; the diff-in-means
+direction does not carry the intended semantics at a usable scale. Measurement
 and forcing (C6) are unaffected.
 
 ## Contributing

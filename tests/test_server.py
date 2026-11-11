@@ -206,6 +206,14 @@ def _tokens(msgs) -> list[dict]:
     return [m for m in msgs if m["type"] == "token"]
 
 
+async def _next_token(sock, timeout=120) -> dict:
+    """Skip non-token frames (`prefill`) — the first frame is not the first token."""
+    while True:
+        msg = json.loads(await asyncio.wait_for(sock.recv(), timeout=timeout))
+        if msg["type"] == "token":
+            return msg
+
+
 def _token_ids(msgs) -> list[int]:
     return [m["token_id"] for m in _tokens(msgs)]
 
@@ -528,8 +536,11 @@ def test_cancel_stops_after_current_token(live):
         async with websockets.connect(_ws_url(live), open_timeout=30) as sock:
             await sock.send(json.dumps(_chat(max_new=256, layer=0, coef=0.0)))
             msgs = []
-            first = json.loads(await asyncio.wait_for(sock.recv(), timeout=120))
-            msgs.append(first)
+            while True:                     # skip the `prefill` frame
+                first = json.loads(await asyncio.wait_for(sock.recv(), timeout=120))
+                msgs.append(first)
+                if first["type"] in ("token", "done", "error"):
+                    break
             if first["type"] != "token":
                 return msgs
             await sock.send(json.dumps({"type": "cancel"}))
@@ -555,8 +566,7 @@ def test_cancel_is_owner_only(live):
         async with (websockets.connect(_ws_url(live), open_timeout=30) as a,
                     websockets.connect(_ws_url(live), open_timeout=30) as b):
             await a.send(json.dumps(_chat(max_new=256, layer=0, coef=0.0)))
-            first = json.loads(await asyncio.wait_for(a.recv(), timeout=120))
-            assert first["type"] == "token"
+            await _next_token(a)
 
             await b.send(json.dumps({"type": "cancel"}))
             denied = json.loads(await asyncio.wait_for(b.recv(), timeout=30))
@@ -564,8 +574,7 @@ def test_cancel_is_owner_only(live):
             assert denied["message"] == "not your generation"
 
             # A keeps streaming: B's cancel must not have touched it.
-            nxt = json.loads(await asyncio.wait_for(a.recv(), timeout=120))
-            assert nxt["type"] == "token"
+            await _next_token(a)
 
             await a.send(json.dumps({"type": "cancel"}))
             while True:
@@ -594,8 +603,7 @@ def test_second_chat_while_streaming_is_busy(live):
         async with (websockets.connect(_ws_url(live), open_timeout=30) as a,
                     websockets.connect(_ws_url(live), open_timeout=30) as b):
             await a.send(json.dumps(_chat(max_new=256, layer=0, coef=0.0)))
-            first = json.loads(await asyncio.wait_for(a.recv(), timeout=120))
-            assert first["type"] == "token"
+            await _next_token(a)            # skip the `prefill` frame
 
             res = await asyncio.to_thread(httpx.get, live + "/api/health", timeout=10)
             assert res.json()["busy"] is True

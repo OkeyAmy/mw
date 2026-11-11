@@ -168,9 +168,11 @@ class _FakeEngine:
         self.adapter = _FakeAdapter()
         self.fail = fail
 
-    def stream(self, messages, max_new, control, on_injected=None):
+    def stream(self, messages, max_new, control, on_injected=None, on_prefill=None):
         if self.fail:
             raise RuntimeError("adapter exploded")
+        if on_prefill is not None:
+            on_prefill(1)
         for i in range(2):
             yield {"step": i, "token": "x", "token_id": i, "ms": 1,
                    "topk": [], "layers": []}

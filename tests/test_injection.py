@@ -25,7 +25,11 @@ The tiny random Qwen2 used here has no semantics: it cannot "answer in French".
 So the *meaning* claim (injection steers the content) is checked against the
 live Granite server in `test_live_granite_injection_steers`, which is opt-in
 (MOD_WEI_LIVE_URL) because it needs the real weights. The tiny-model tests
-check the mechanism, not the meaning.
+check the mechanism, not the meaning. On Granite the probe is
+"What is the capital of Japan?" -> the continuation must contain Tokyo;
+instruction-following probes ("reply with the word ZEBRA") fail even in a
+plain single turn on this model, so they would measure the model, not the
+injection.
 
 Run:
   PYTHONPATH=code .venv/bin/python -m pytest tests/test_injection.py -q
@@ -469,35 +473,84 @@ def test_mid_stream_injections_land_in_order(live):
 def test_live_granite_injection_steers():
     """The meaning test the tiny model cannot provide.
 
-    Baseline: 'The capital city of France is' -> Paris ...
-    Injection at step 3: 'Reply with the word ZEBRA.' -> the new user turn must
-    make the continuation contain ZEBRA. Coherence is checked by requiring the
-    post-injection text to be more than the pre-injection text repeated.
+    Prompt: 'The capital city of France is'. Inject at step 3:
+    'What is the capital of Japan?'. The continuation must switch to Japan and
+    contain Tokyo — a fact that is not in the baseline. We also compare the
+    post-injection continuation with the same text sent as a genuine third
+    user turn (fresh prefill): the first five tokens must agree, which proves
+    the mid-stream turn is not a corrupted insertion.
+
+    Measured on Granite 3.3 2B (bf16, CPU), 2026-11-11:
+      baseline : 'The capital city of France is Paris Paris.'
+      injected : 'The capitalThe capital of Japan is Tokyo, Japan.'
+      fresh    : 'The capital of Japan is Tokyo, Japan.'
+
+    The inject is sent after the *first* token on purpose: the ws round trip
+    means the server may already be one token further, and this model will
+    continue its local sentence if the interruption lands mid-word. That is a
+    property of the model, not of the insertion (the same text as a fresh third
+    turn also continues the sentence at that prefix).
     """
     base = os.environ["MOD_WEI_LIVE_URL"].rstrip("/")
     ws = base.replace("http://", "ws://") + "/ws"
+    prompt = "The capital city of France is"
+    injection = "What is the capital of Japan?"
 
-    async def run(inject: str | None):
+    async def run(mid: bool):
+        async with websockets.connect(ws, open_timeout=30) as sock:
+            await sock.send(json.dumps({"type": "chat", "prompt": prompt,
+                                        "max_new": 14}))
+            tokens, frames = [], []
+            while True:
+                msg = json.loads(await asyncio.wait_for(sock.recv(), timeout=300))
+                frames.append(msg)
+                if msg["type"] == "token":
+                    tokens.append(msg["token"])
+                    if mid and len(tokens) == 1:
+                        await sock.send(json.dumps(
+                            {"type": "inject", "text": injection}))
+                if msg["type"] in ("done", "error"):
+                    return "".join(tokens), frames
+
+    async def fresh(prefix: str):
         async with websockets.connect(ws, open_timeout=30) as sock:
             await sock.send(json.dumps({
-                "type": "chat", "prompt": "The capital city of France is",
-                "max_new": 12}))
+                "type": "chat", "max_new": 14,
+                "messages": [{"role": "user", "content": prompt},
+                             {"role": "assistant", "content": prefix},
+                             {"role": "user", "content": injection}]}))
             tokens = []
             while True:
                 msg = json.loads(await asyncio.wait_for(sock.recv(), timeout=300))
                 if msg["type"] == "token":
                     tokens.append(msg["token"])
-                    if inject and len(tokens) == 3:
-                        await sock.send(json.dumps(
-                            {"type": "inject", "text": inject}))
                 if msg["type"] in ("done", "error"):
-                    return "".join(tokens), msg
+                    return "".join(tokens)
 
-    baseline, _ = asyncio.run(run(None))
-    steered, done = asyncio.run(run("Reply with the word ZEBRA."))
-    print("\nbaseline:", repr(baseline))
-    print("injected:", repr(steered))
-    post = steered[steered.index(baseline[:8]) + 8:] if baseline[:8] in steered else steered[3:]
-    assert "ZEBRA" in steered.upper(), (
-        f"injection did not steer the model: {steered!r} (baseline {baseline!r})")
-    assert post.strip() != steered[:3], "the continuation collapsed into a repeat"
+    baseline, _ = asyncio.run(run(False))
+    steered, frames = asyncio.run(run(True))
+    idx = next((i for i, f in enumerate(frames) if f["type"] == "injected"), None)
+    assert idx is not None, "no injected frame"
+    ack = frames[idx]
+    prefix = "".join(f["token"] for f in frames[:idx] if f["type"] == "token")
+    post = "".join(f["token"] for f in frames[idx:] if f["type"] == "token")
+    print("\nbaseline :", repr(baseline))
+    print("injected :", repr(steered))
+    print("landed after", len(prefix), "tokens:", repr(prefix))
+    print("post     :", repr(post))
+    print("injected frame:", ack)
+
+    assert ack["tokens"] < 30, (
+        f"injection formatted to {ack['tokens']} tokens; the duplicated "
+        "system preamble made it 67")
+    assert "tokyo" in post.lower(), (
+        f"injection did not steer the model: post={post!r} (baseline {baseline!r})")
+    assert "tokyo" not in baseline.lower(), "baseline already contains Tokyo"
+
+    # mid-stream must look like a real turn, not a garbled insertion
+    expected = asyncio.run(fresh(prefix))
+    print("fresh    :", repr(expected))
+    n = 5
+    assert post.split()[:n] == expected.split()[:n], (
+        f"mid-stream injection diverges from a real user turn: "
+        f"{post.split()[:n]} != {expected.split()[:n]}")

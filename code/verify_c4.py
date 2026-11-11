@@ -62,7 +62,28 @@ def main() -> int:
 
     t0 = time.time()
     vectors = a.build_steer_vectors()
-    print(f"vectors: {len(vectors)} layers, {time.time()-t0:.1f}s", flush=True)
+
+    # CALIBRATION (S1 finding, 2026-11-12): the raw vectors were ~335 units while
+    # the residual norm at that layer is ~5, so coef=2 was a ~130x perturbation
+    # and both real and random vectors saturated. Rescale every layer to its mean
+    # residual norm so coef=1 means "one residual norm".
+    a._capturing = True
+    a._capture_full = False
+    scale_acc: dict[int, list] = {}
+    for p in HELDOUT:
+        i = a.tok(p, return_tensors="pt").input_ids
+        a._pre.clear()
+        with torch.no_grad():
+            a.model(input_ids=i)
+        for l, h in a._pre.items():
+            scale_acc.setdefault(l, []).append(float(h.norm()))
+    a._capturing = False
+    scale = {l: statistics.mean(v) for l, v in scale_acc.items() if v}
+    vectors = {l: v / max(float(v.norm()), 1e-8) * scale.get(l, 1.0)
+               for l, v in vectors.items()}
+    print(f"vectors: {len(vectors)} layers, calibrated to residual norm, "
+          f"{time.time()-t0:.1f}s", flush=True)
+    print(f"  scales: L8={scale.get(8,0):.2f} L16={scale.get(16,0):.2f}", flush=True)
 
     # sanity: is the vector distinguishable from a token embedding?
     emb = a.model.get_input_embeddings().weight
@@ -100,9 +121,9 @@ def main() -> int:
 
     results = {}
     for layer in (8, 16):
-        te, ce, sg = measure(vectors[layer], layer, 2.0)
+        te, ce, sg = measure(vectors[layer], layer, 1.0)
         results[layer] = {"te": te, "ce": ce, "sign": sg}
-        print(f"  L{layer} coef+2: target={te:+.3f} control={ce:.3f} sign={sg:.2f}", flush=True)
+        print(f"  L{layer} coef+1: target={te:+.3f} control={ce:.3f} sign={sg:.2f}", flush=True)
 
     layer = max(results, key=lambda l: results[l]["te"])
     print(f"best layer: L{layer}")
@@ -112,7 +133,7 @@ def main() -> int:
     for k in range(args.randoms):
         rv = torch.randn(vectors[layer].shape, generator=rng)
         rv = rv / rv.norm() * vectors[layer].norm()
-        te, ce, sg = measure(rv, layer, 2.0)
+        te, ce, sg = measure(rv, layer, 1.0)
         rnd.append({"te": te, "ce": ce, "sign": sg})
         print(f"  random {k+1}/{args.randoms}: target={te:+.2f} control={ce:.2f} sign={sg:.2f}",
               flush=True)
