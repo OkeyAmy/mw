@@ -79,17 +79,22 @@ def main() -> int:
     def effect(lg, idset, other):
         return float(torch.logsumexp(lg[idset], 0) - torch.logsumexp(lg[other], 0))
 
+    # Precompute baselines ONCE. The old loop recomputed them for every vector,
+    # tripling the forward count and blowing the time budget.
+    base = {}
+    for p in HELDOUT:
+        lg = fwd(p)
+        base[p] = (effect(lg, ct, cd), abs(effect(lg, yt, nt)))
+
     def measure(vec, layer, coef):
         a.set_steer(layer, vec, coef)
         te, ce, sign = [], [], []
         for p in HELDOUT:
-            a.set_steer(None, None, 0.0)
-            base = effect(fwd(p), ct, cd)
-            a.set_steer(layer, vec, coef)
-            st = effect(fwd(p), ct, cd)
-            ce.append(abs(effect(fwd(p), yt, nt)))
-            te.append(st - base)
-            sign.append(1 if st - base > 0 else 0)
+            lg = fwd(p)
+            t = effect(lg, ct, cd) - base[p][0]
+            te.append(t)
+            ce.append(abs(effect(lg, yt, nt)))
+            sign.append(1 if t > 0 else 0)
         a.set_steer(None, None, 0.0)
         return statistics.mean(te), statistics.mean(ce), sum(sign) / len(sign)
 
@@ -104,11 +109,13 @@ def main() -> int:
 
     rng = torch.Generator().manual_seed(7)
     rnd = []
-    for _ in range(args.randoms):
+    for k in range(args.randoms):
         rv = torch.randn(vectors[layer].shape, generator=rng)
         rv = rv / rv.norm() * vectors[layer].norm()
         te, ce, sg = measure(rv, layer, 2.0)
         rnd.append({"te": te, "ce": ce, "sign": sg})
+        print(f"  random {k+1}/{args.randoms}: target={te:+.2f} control={ce:.2f} sign={sg:.2f}",
+              flush=True)
 
     real = results[layer]
     t1 = real["te"] > pct([r["te"] for r in rnd], 95)

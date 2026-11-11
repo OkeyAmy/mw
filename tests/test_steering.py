@@ -20,7 +20,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "code"))
 
-from app.server import GenControl, LiveAdapter, SteerState  # noqa: E402
+from app.server import (  # noqa: E402
+    STEER_MIN_COEF,
+    GenControl,
+    LiveAdapter,
+    SteerState,
+)
 from mw.adapter import ModelAdapter  # noqa: E402
 
 VOCAB = 512
@@ -151,6 +156,27 @@ def test_neuron_clamp_changes_logits(ad, ids):
     assert torch.equal(base, _logits(ad, ids)), "clear_neuron_steer left a residue"
 
 
+def test_neuron_view_reports_the_clamped_value(ad, ids):
+    """The UI's neuron list is captured AFTER the clamp, so a user who applies a
+    value must see that exact value in the trace — otherwise the control looks
+    dead even when it worked."""
+    ad._capturing = True
+    ad._capture_full = False
+    ad.model(input_ids=ids, use_cache=False)
+    ad._capturing = False
+    neuron, _natural = ad.top_neurons(2, 1)[0]
+
+    ad.set_neuron_steer(2, neuron, 50.0)
+    ad._capturing = True
+    ad.model(input_ids=ids, use_cache=False)
+    ad._capturing = False
+    ad.clear_neuron_steer(None)
+
+    seen = dict(ad.top_neurons(2, 64))
+    assert seen.get(neuron) == pytest.approx(50.0), (
+        f"n{neuron} was clamped to 50 but the trace reports {seen.get(neuron)}")
+
+
 # -- 5. provenance ---------------------------------------------------------
 def _stream(ad, state, n=3):
     control = GenControl(state)
@@ -240,11 +266,22 @@ def test_streams_with_different_states_diverge(ad):
         "two connections produced identical distributions — the state leaked")
 
 
-# -- 7. the server's apply_steering guard ----------------------------------
-def test_apply_steering_treats_negligible_coef_as_off(ad, ids, vecs):
+# -- 7. provenance and application cannot disagree --------------------------
+def test_negligible_coef_is_off_and_says_so(ad, ids, vecs):
+    """A coef the adapter skips must not be reported as `steered: true`.
+
+    Measured before the fix: SteerState(2, 1e-9).steered() was True while
+    apply_steering wrote nothing — a frame claiming an intervention that never
+    happened. Both sides now share STEER_MIN_COEF.
+    """
     base = _logits(ad, ids)
     state = SteerState()
-    state.set_base(2, 1e-9)                  # below apply_steering's 1e-6 guard
+    state.set_base(2, STEER_MIN_COEF / 10)
     ad.apply_steering(state, vecs)
-    assert torch.equal(base, _logits(ad, ids))
-    assert state.steered() is True           # provenance still reports intent
+    assert torch.equal(base, _logits(ad, ids)), "coef below the guard still wrote"
+    assert state.steered() is False, "provenance claims steering that did not happen"
+
+    state.set_base(2, STEER_MIN_COEF)
+    assert state.steered() is True
+    ad.apply_steering(state, vecs)
+    assert not torch.equal(base, _logits(ad, ids)), "coef at the guard wrote nothing"

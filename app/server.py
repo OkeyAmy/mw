@@ -56,6 +56,11 @@ MAX_PROMPT_CHARS = 4000
 MAX_TRANSCRIPT_CHARS = 16000     # whole `messages` transcript cap
 MAX_INJECT_CHARS = 2000
 MAX_COEF = 20.0                  # coef is bounded: units of mean residual norm
+# |coef| below this writes nothing into the residual stream (float32 cannot see
+# it, and the wire rounds coef to 4 dp). It is shared by apply_steering and
+# SteerState.steered() so a frame can never claim `steered: true` for a coef the
+# adapter skips — that mismatch is an unverifiable claim, not a rounding detail.
+STEER_MIN_COEF = 1e-4
 MAX_NEURON_VALUE = 1e4           # an MLP activation clamp, not a weight edit
 MAX_SESSIONS = 20                # bounded in-memory export store
 MAX_STORED_TOKENS = MAX_NEW_LIMIT
@@ -280,7 +285,10 @@ class SteerState:
         self.coef = coef
 
     def steered(self) -> bool:
-        return bool(self.neurons) or (self.layer is not None and self.coef != 0.0)
+        # Same threshold as apply_steering: provenance must describe what the
+        # adapter actually wrote, not what the slider asked for.
+        return bool(self.neurons) or (
+            self.layer is not None and abs(self.coef) >= STEER_MIN_COEF)
 
     def neuron_payload(self) -> dict | None:
         if not self.neurons:
@@ -595,7 +603,8 @@ class LiveAdapter(ModelAdapter):
         return self.tok(turn, return_tensors="pt", add_special_tokens=False).input_ids
 
     def apply_steering(self, state: SteerState, vectors: dict) -> None:
-        if state.layer is None or abs(state.coef) < 1e-6 or state.layer not in vectors:
+        if (state.layer is None or abs(state.coef) < STEER_MIN_COEF
+                or state.layer not in vectors):
             self.set_steer(None, None, 0.0)
         else:
             self.set_steer(state.layer, vectors[state.layer], state.coef, site="pre")
@@ -750,6 +759,11 @@ class Engine:
         self.adapter = LiveAdapter(path).load(dtype=dtype)
         # H3-3: default contrast pairs, all token positions, same suffix.
         self.vectors = self.adapter.build_steer_vectors()
+        # A present-but-all-zero vector accepts coef != 0 and changes nothing,
+        # which is indistinguishable from "the slider is broken". Never offer
+        # one: validation below rejects layers that are not in `usable`.
+        self.usable = {l: v for l, v in self.vectors.items()
+                       if float(v.norm()) > STEER_MIN_COEF}
 
     @property
     def n_layers(self) -> int:
@@ -1074,7 +1088,7 @@ async def ws(sock: WebSocket):
                                           "message": f"invalid request: layer {chat.layer} out of "
                                                      f"range 0..{ENGINE.n_layers - 1}"})
                         continue
-                    if chat.coef != 0.0 and chat.layer not in ENGINE.vectors:
+                    if chat.coef != 0.0 and chat.layer not in ENGINE.usable:
                         await send_async({"type": "error",
                                           "message": f"invalid request: no steering vector for "
                                                      f"layer {chat.layer}"})
@@ -1102,7 +1116,7 @@ async def ws(sock: WebSocket):
                                       "message": f"invalid request: layer {st.layer} out of range "
                                                  f"0..{ENGINE.n_layers - 1}"})
                     continue
-                if st.coef != 0.0 and st.layer not in ENGINE.vectors:
+                if st.coef != 0.0 and st.layer not in ENGINE.usable:
                     await send_async({"type": "error",
                                       "message": f"invalid request: no steering vector for "
                                                  f"layer {st.layer}"})
@@ -1278,6 +1292,14 @@ def main() -> int:
         sys.stderr.write(f"[mw] refusing to load: {exc}\n")
         return 2
     print(f"[mw] {len(ENGINE.vectors)} steering vectors ready", flush=True)
+    norms = sorted(float(v.norm()) for v in ENGINE.usable.values())
+    if norms:
+        print(f"[mw] steering: {len(ENGINE.usable)}/{len(ENGINE.vectors)} layers "
+              f"usable | |v| min {norms[0]:.3f} median {norms[len(norms) // 2]:.3f} "
+              f"max {norms[-1]:.3f} (coef 1 = one such vector)", flush=True)
+    else:
+        print("[mw] steering: NO usable vector — the slider cannot do anything; "
+              "check build_steer_vectors()", flush=True)
     print(f"[mw] generation watchdog: {GEN_TIMEOUT_S:.0f}s "
           f"(hard grace {GEN_HARD_GRACE_S:.0f}s)", flush=True)
     print(f"[mw] http://{args.host}:{args.port}", flush=True)

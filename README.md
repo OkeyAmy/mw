@@ -181,7 +181,7 @@ make prove   # the full C1–C8 chain
 | C1 trace | PASS — `0.000e+00` |
 | C2 lens identity | PASS — `0.000e+00` |
 | C3 causal patching | PASS — L22–27 ≈ 1.0, L0–20 ≈ 0 |
-| C4 steering specificity | **NOT RE-RUN** — see note below |
+| C4 steering specificity | **FAIL** — re-run with the corrected estimator, T1/T4 still fail |
 | C5 mid-generation | PASS — divergence begins after the switch |
 | C6 force vs steer | **PROVISIONAL** — force 1.00 works; the semantic arm used the broken vector |
 | C7 neuron atlas | PASS at threshold 1e-6 (coverage, not meaning) |
@@ -190,18 +190,35 @@ make prove   # the full C1–C8 chain
 The instrument is trustworthy. The *control* claim is **not yet established** —
 which is different from "disproved".
 
-**Why C4 is "not re-run" rather than "failed":** the first C4 run failed on
-bf16 — random vectors matched or beat the steering vector. That was a real
-measurement, but it was measuring the wrong object. The vector at the time was
-built from the **last token only**, and the positive prompts all ended with the
-same token, so at layer 0 the "comment direction" was numerically identical to
-an embedding difference (cosine 1.00000). It was steering "ends with this token",
-not "comment mode".
+**C4, re-run with the corrected estimator (2026-11-11).** The first run used a
+last-token vector that was numerically identical to an embedding difference
+(cosine 1.00000) — it was steering "ends with this token", not comment mode.
+The estimator is now position-averaged over pairs with an identical suffix, and
+the artifact is gone:
 
-The estimator is now position-averaged and uses pairs with an identical suffix.
-**C4 has not been re-run since that fix.** Until it is, the correct status is
-unverified — not failed, and not passed. C6's semantic arm inherited the same
-defect, so only its forcing arm is trustworthy.
+```
+L0  norm=  0.3   max cos to any token embedding = 0.4669
+L8  norm=335.1   max cos = 0.0925
+L16 norm=338.5   max cos = 0.0920
+```
+
+The conclusion did not change. At the best layer (L16, coef +2), against 20
+random vectors of matched norm:
+
+| test | result | numbers |
+|---|---|---|
+| T1 selectivity | **FAIL** | real target +4.56 vs random p95 **+9.45** |
+| T2 collateral | **PASS** | real control 1.79 vs random median 2.32 |
+| T4 held-out sign | **FAIL** | real 1.00, but random p95 is also 1.00 |
+
+So: random perturbations move the target logit *more* than our vector does, and
+many of them are equally consistent across held-out prompts. The one real signal
+is that our vector does **less collateral damage** than the median random
+vector — it is gentler, not stronger.
+
+This is the honest status: **we cannot show that our steering vector does
+something a random direction cannot.** Control remains unestablished; measurement
+and forcing (C6) are unaffected.
 
 ## Contributing
 
