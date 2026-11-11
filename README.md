@@ -26,12 +26,12 @@ prompt ──► transformer ──► next token
 ## Known boundaries — and what is still open
 
 These are stated as **measured facts** or **UNVERIFIED**, never as settled
-negatives. See `STATE_OF_PROJECT.md` for the live list.
+negatives. The live list is tracked locally, not published.
 
 **Measured:**
 - APIs do not return hidden states. Activation-level tracing requires weights.
 - Superposition and polysemanticity are real; "neuron 4021 = recursion" is not a
-  thing in the weights. (Evidence: `agents/A6_limits.md`.)
+  thing in the weights.
 
 **Open — do not treat as settled:**
 - **Can internals be recovered from an API?** Partly, yes — Carlini et al. 2024
@@ -158,7 +158,6 @@ This is the part that matters more than the features.
 | `VALIDATION.md` | hypothesis → test → result → verdict. Citations must be fetched, numbers recomputed. |
 | `PROOF_CHAIN.md` | eight links (C1–C8), each with a pass criterion and a negative control. |
 | `tests/` | fast tests need no model (CI); slow tests load real weights (release gate). |
-| `STATE_OF_PROJECT.md` | what is settled vs contested, including our own errors. |
 
 Rules learned the hard way, now enforced:
 
@@ -182,15 +181,27 @@ make prove   # the full C1–C8 chain
 | C1 trace | PASS — `0.000e+00` |
 | C2 lens identity | PASS — `0.000e+00` |
 | C3 causal patching | PASS — L22–27 ≈ 1.0, L0–20 ≈ 0 |
-| C4 steering specificity | **FAIL** on bf16 — provisional, criterion under audit |
+| C4 steering specificity | **NOT RE-RUN** — see note below |
 | C5 mid-generation | PASS — divergence begins after the switch |
-| C6 force vs steer | PASS — force 1.00, semantic 0.00 |
+| C6 force vs steer | **PROVISIONAL** — force 1.00 works; the semantic arm used the broken vector |
 | C7 neuron atlas | PASS at threshold 1e-6 (coverage, not meaning) |
 | C8 sanity gate | PASS — 10/10 |
 
 The instrument is trustworthy. The *control* claim is **not yet established** —
-which is different from "disproved". C5 shows intervention changes generation;
-C4/C6 say our current vector does not do so in a way random vectors cannot.
+which is different from "disproved".
+
+**Why C4 is "not re-run" rather than "failed":** the first C4 run failed on
+bf16 — random vectors matched or beat the steering vector. That was a real
+measurement, but it was measuring the wrong object. The vector at the time was
+built from the **last token only**, and the positive prompts all ended with the
+same token, so at layer 0 the "comment direction" was numerically identical to
+an embedding difference (cosine 1.00000). It was steering "ends with this token",
+not "comment mode".
+
+The estimator is now position-averaged and uses pairs with an identical suffix.
+**C4 has not been re-run since that fix.** Until it is, the correct status is
+unverified — not failed, and not passed. C6's semantic arm inherited the same
+defect, so only its forcing arm is trustworthy.
 
 ## Contributing
 

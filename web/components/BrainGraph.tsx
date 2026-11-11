@@ -27,6 +27,8 @@ interface Props {
   selectedLayer: number | null;
   layers: number;
   mode: "layers" | "pca";
+  pending: boolean;
+  prefilling: number | null;
   onPick: (layer: number, tokenIndex: number) => void;
   onExample?: (text: string) => void;
 }
@@ -61,12 +63,22 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
+function nodeKey(n: NodeView): string {
+  return `${n.layer}:${n.neuron}`;
+}
+
+function easeOut(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
 export function BrainGraph({
   traces,
   selectedIndex,
   selectedLayer,
   layers,
   mode,
+  pending,
+  prefilling,
   onPick,
   onExample,
 }: Props) {
@@ -76,6 +88,11 @@ export function BrainGraph({
   const lastLenRef = useRef(0);
   const hoverRef = useRef<NodeView | null>(null);
   const dirtyRef = useRef(true);
+  const targetsRef = useRef<NodeView[]>([]);
+  const animRef = useRef<Map<string, { from: NodeView; to: NodeView; start: number }>>(
+    new Map(),
+  );
+  const nowNodesRef = useRef<NodeView[]>([]);
 
   const [size, setSize] = useState({ w: 640, h: 420 });
   const [hover, setHover] = useState<{ x: number; y: number; text: string } | null>(null);
@@ -167,6 +184,33 @@ export function BrainGraph({
     return out;
   }, [trace, layerCount, layout, stats.maxAbs, stats.maxNorm]);
 
+  const stepNodes = useCallback((now: number): NodeView[] => {
+    const map = animRef.current;
+    if (map.size === 0) return nowNodesRef.current;
+    const out: NodeView[] = [];
+    let active = false;
+    for (const target of targetsRef.current) {
+      const a = map.get(nodeKey(target));
+      if (!a) {
+        out.push(target);
+        continue;
+      }
+      const k = Math.min(1, Math.max(0, (now - a.start) / 280));
+      if (k < 1) active = true;
+      const e = easeOut(k);
+      out.push({
+        ...target,
+        x: a.from.x + (a.to.x - a.from.x) * e,
+        y: a.from.y + (a.to.y - a.from.y) * e,
+        r: a.from.r + (a.to.r - a.from.r) * e,
+        hot: a.from.hot + (a.to.hot - a.from.hot) * e,
+      });
+    }
+    if (!active) map.clear();
+    nowNodesRef.current = out;
+    return out;
+  }, []);
+
   // ------------------------------------------------------------------ draw ---
   const draw = useCallback(
     (now: number) => {
@@ -190,19 +234,30 @@ export function BrainGraph({
       const accent = `rgba(${ACCENT},`;
       const { colX, midY } = layout;
 
-      // layer axes + labels
+      // flash intensity per layer while the wave crosses it
+      const flash = new Map<number, number>();
+      for (const p of particlesRef.current) {
+        const t = (now - p.born) / 1000 / p.dur;
+        if (t < 0 || t > 1) continue;
+        const f = Math.sin(Math.PI * t);
+        flash.set(p.layer, Math.max(flash.get(p.layer) ?? 0, f));
+        flash.set(p.layer + 1, Math.max(flash.get(p.layer + 1) ?? 0, f));
+      }
+
+      // layer axes + labels: the silhouette must read before the first token
       ctx.font = "10px 'JetBrains Mono', ui-monospace, monospace";
       ctx.textAlign = "center";
       for (let l = 0; l < layerCount; l += 1) {
         const x = colX(l);
-        ctx.strokeStyle = `${muted}0.13)`;
+        const f = flash.get(l) ?? 0;
+        ctx.strokeStyle = f > 0.03 ? `${accent}${0.2 + f * 0.35})` : `${accent}0.2)`;
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(Math.round(x) + 0.5, layout.padT - 8);
         ctx.lineTo(Math.round(x) + 0.5, size.h - layout.padB + 6);
         ctx.stroke();
         if (l % 5 === 0 || l === layerCount - 1) {
-          ctx.fillStyle = `${muted}0.55)`;
+          ctx.fillStyle = f > 0.03 ? `${accent}${0.55 + f * 0.45})` : `${muted}0.55)`;
           ctx.fillText(`L${l}`, x, size.h - layout.padB + 18);
         }
       }
@@ -217,7 +272,7 @@ export function BrainGraph({
         }
         ctx.fillStyle = `${muted}0.5)`;
         ctx.font = "10px 'JetBrains Mono', ui-monospace, monospace";
-        ctx.fillText("no data", colX(Math.floor(layerCount / 2)), midY + 22);
+        ctx.fillText(pending ? "prefilling…" : "no data", colX(Math.floor(layerCount / 2)), midY + 22);
         return;
       }
 
@@ -266,13 +321,43 @@ export function BrainGraph({
       }
 
       // ---- columns mode ----------------------------------------------------
-      const nodes = buildNodes();
+      const nodes = stepNodes(now);
       const byLayer = new Map<number, NodeView[]>();
       for (const n of nodes) {
         const list = byLayer.get(n.layer) ?? [];
         list.push(n);
         byLayer.set(n.layer, list);
       }
+
+      // faded history: the last 4 token trajectories
+      const band = layout.usableH * 0.55;
+      const logMax = Math.log1p(Math.max(1e-9, stats.maxAbs));
+      const tracePath = (source: TokenTrace, alpha: number, width: number) => {
+        let moved = false;
+        ctx.beginPath();
+        for (let l = 0; l < layerCount; l += 1) {
+          const layer = source.layers.find((x) => x.l === l);
+          if (!layer || layer.neurons.length === 0) continue;
+          const v = layer.neurons[0][1];
+          const logNorm = clamp(Math.log1p(Math.abs(v)) / logMax, 0, 1);
+          const x = colX(l);
+          const y = layout.midY + (0.5 - logNorm) * band;
+          if (!moved) {
+            ctx.moveTo(x, y);
+            moved = true;
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+        ctx.strokeStyle = `${accent}${alpha})`;
+        ctx.lineWidth = width;
+        ctx.stroke();
+      };
+      for (let i = Math.max(0, activeIndex - 4); i < activeIndex; i += 1) {
+        const past = traces[i];
+        if (past) tracePath(past, 0.15, 1);
+      }
+      tracePath(trace, 0.5, 1.3);
 
       // adjacency edges (structure, not weights)
       for (let l = 0; l < layerCount - 1; l += 1) {
@@ -375,8 +460,38 @@ export function BrainGraph({
       }
 
     },
-    [buildNodes, layout, layerCount, mode, selectedLayer, size, stats.maxNorm, trace],
+    [
+      layout,
+      layerCount,
+      mode,
+      pending,
+      selectedLayer,
+      size,
+      stats.maxAbs,
+      stats.maxNorm,
+      stepNodes,
+      trace,
+      traces,
+      activeIndex,
+    ],
   );
+
+  // On every token, keep the previous frame's interpolated values and ease to
+  // the new ones over 280 ms. Nothing is rebuilt; the same arrays are mutated.
+  useEffect(() => {
+    const targets = buildNodes();
+    const now = performance.now();
+    const prev = new Map(nowNodesRef.current.map((n) => [nodeKey(n), n]));
+    const next = new Map<string, { from: NodeView; to: NodeView; start: number }>();
+    for (const t of targets) {
+      next.set(nodeKey(t), { from: prev.get(nodeKey(t)) ?? t, to: t, start: now });
+    }
+    targetsRef.current = targets;
+    animRef.current = next;
+    if (nowNodesRef.current.length === 0) nowNodesRef.current = targets;
+    dirtyRef.current = true;
+    draw(performance.now());
+  }, [buildNodes, draw]);
 
   // redraw on data/layout changes; loop only while particles are alive
   useEffect(() => {
@@ -389,7 +504,7 @@ export function BrainGraph({
     let last = 0;
     const loop = (ts: number) => {
       raf = requestAnimationFrame(loop);
-      const alive = particlesRef.current.length > 0;
+      const alive = particlesRef.current.length > 0 || animRef.current.size > 0;
       if (alive || dirtyRef.current) {
         if (ts - last > 16 || dirtyRef.current) {
           draw(ts);
@@ -406,10 +521,10 @@ export function BrainGraph({
   useEffect(() => {
     if (traces.length > lastLenRef.current) {
       const token = traces[traces.length - 1];
-      const dur = clamp((token.ms / 1000) * 0.85, 0.22, 2.6);
+      const dur = clamp((token.ms / 1000) * 0.9, 0.3, 1.1);
       const now = performance.now();
       for (let l = 0; l < layerCount - 1; l += 1) {
-        particlesRef.current.push({ layer: l, born: now + l * 7, dur });
+        particlesRef.current.push({ layer: l, born: now + l * 4, dur });
       }
       if (particlesRef.current.length > 240) {
         particlesRef.current.splice(0, particlesRef.current.length - 240);
@@ -441,7 +556,7 @@ export function BrainGraph({
       const rect = canvas.getBoundingClientRect();
       const x = clientX - rect.left;
       const y = clientY - rect.top;
-      const nodes = buildNodes();
+      const nodes = nowNodesRef.current.length > 0 ? nowNodesRef.current : buildNodes();
       let best: NodeView | null = null;
       let bestD = 14;
       for (const n of nodes) {
@@ -569,6 +684,12 @@ export function BrainGraph({
             {stats.active}
           </span>
         </span>
+        {prefilling !== null ? (
+          <span className="hud-item">
+            <span className="hud-label">prefill</span>
+            <span className="hud-value">{prefilling} tok</span>
+          </span>
+        ) : null}
         <span className="hud-item">
           <span className="hud-label">layer</span>
           <span className="hud-value">
@@ -587,7 +708,7 @@ export function BrainGraph({
           : "x = layer · y = neuron activation · radius = norm · edges = adjacency"}
       </div>
 
-      {noTokens ? (
+      {noTokens && !pending ? (
         <div className="brain-empty">
           <b>Send a prompt to open the brain</b>
           <p>
@@ -600,7 +721,10 @@ export function BrainGraph({
                 type="button"
                 key={example}
                 className="brain-example"
-                onClick={() => onExample?.(example)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onExample?.(example);
+                }}
               >
                 {example}
               </button>

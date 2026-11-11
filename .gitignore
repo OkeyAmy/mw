@@ -24,3 +24,10 @@ dist/
 # local notes
 .env
 .DS_Store
+
+# agent context / orchestration — LOCAL ONLY, never published
+agents/
+LEDGER.md
+RESEARCH_PLAN.md
+STATE_OF_PROJECT.md
+CONTEXT.md
