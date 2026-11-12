@@ -31,3 +31,7 @@ LEDGER.md
 RESEARCH_PLAN.md
 STATE_OF_PROJECT.md
 CONTEXT.md
+
+# certificate caches (regenerable, large)
+*.npz
+proof/**/*.npz

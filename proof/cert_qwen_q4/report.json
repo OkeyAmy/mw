@@ -1,0 +1,430 @@
+{
+ "n_prompts": 41,
+ "n_unique": 41,
+ "duplicates": 0,
+ "flips": 2,
+ "flip_rate": 0.0488,
+ "ci95_low": 0.0135,
+ "ci95_high": 0.1614,
+ "confident_flips": 0,
+ "max_kl": 0.2175,
+ "mean_kl": 0.042,
+ "rows": [
+  {
+   "prompt": "def add(a, b):\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 1.9609,
+   "kl": 0.0125,
+   "flip": false
+  },
+  {
+   "prompt": "def merge(a, b):\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 3.9718,
+   "kl": 0.0071,
+   "flip": false
+  },
+  {
+   "prompt": "class Cache:\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 3.5148,
+   "kl": 0.0025,
+   "flip": false
+  },
+  {
+   "prompt": "async def fetch(url):\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 2.8684,
+   "kl": 0.0059,
+   "flip": false
+  },
+  {
+   "prompt": "def parse(x):\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 3.1989,
+   "kl": 0.005,
+   "flip": false
+  },
+  {
+   "prompt": "with open(path) as fh:\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 3.172,
+   "kl": 0.0106,
+   "flip": false
+  },
+  {
+   "prompt": "while queue:\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 3.137,
+   "kl": 0.0137,
+   "flip": false
+  },
+  {
+   "prompt": "def to_json(obj):\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 4.1512,
+   "kl": 0.005,
+   "flip": false
+  },
+  {
+   "prompt": "for k, v in d.items():\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 3.0104,
+   "kl": 0.0122,
+   "flip": false
+  },
+  {
+   "prompt": "def main():\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 3.9585,
+   "kl": 0.0033,
+   "flip": false
+  },
+  {
+   "prompt": "try:\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 3.3419,
+   "kl": 0.0078,
+   "flip": false
+  },
+  {
+   "prompt": "import os\n",
+   "ref": 474,
+   "cand": 474,
+   "ref_tok": "import",
+   "cand_tok": "import",
+   "margin_ref": 1.3348,
+   "kl": 0.0084,
+   "flip": false
+  },
+  {
+   "prompt": "return {\n",
+   "ref": 220,
+   "cand": 220,
+   "ref_tok": " ",
+   "cand_tok": " ",
+   "margin_ref": 0.2269,
+   "kl": 0.0299,
+   "flip": false
+  },
+  {
+   "prompt": "if __name__ == '__main__':\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 4.5569,
+   "kl": 0.0033,
+   "flip": false
+  },
+  {
+   "prompt": "def __init__(self, x):\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 1.8841,
+   "kl": 0.012,
+   "flip": false
+  },
+  {
+   "prompt": "raise ValueError(\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 2.2412,
+   "kl": 0.0116,
+   "flip": false
+  },
+  {
+   "prompt": "for i in range(10):\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 3.4873,
+   "kl": 0.0028,
+   "flip": false
+  },
+  {
+   "prompt": "print(f\"{x}\")\n",
+   "ref": 1350,
+   "cand": 1350,
+   "ref_tok": "print",
+   "cand_tok": "print",
+   "margin_ref": 1.0069,
+   "kl": 0.0668,
+   "flip": false
+  },
+  {
+   "prompt": "def fib(n):\n    return n if n < 2 else\n",
+   "ref": 286,
+   "cand": 286,
+   "ref_tok": "       ",
+   "cand_tok": "       ",
+   "margin_ref": 0.308,
+   "kl": 0.012,
+   "flip": false
+  },
+  {
+   "prompt": "sorted(items, key=lambda x:\n",
+   "ref": 310,
+   "cand": 310,
+   "ref_tok": "           ",
+   "cand_tok": "           ",
+   "margin_ref": 0.3008,
+   "kl": 0.0245,
+   "flip": false
+  },
+  {
+   "prompt": "with lock:\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 1.3072,
+   "kl": 0.0218,
+   "flip": false
+  },
+  {
+   "prompt": "assert isinstance(x, int)\n",
+   "ref": 2207,
+   "cand": 2207,
+   "ref_tok": "assert",
+   "cand_tok": "assert",
+   "margin_ref": 2.5719,
+   "kl": 0.1032,
+   "flip": false
+  },
+  {
+   "prompt": "yield from gen()\n",
+   "ref": 2,
+   "cand": 2,
+   "ref_tok": "#",
+   "cand_tok": "#",
+   "margin_ref": 0.4126,
+   "kl": 0.1142,
+   "flip": false
+  },
+  {
+   "prompt": "lambda x: x + 1\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 0.3242,
+   "kl": 0.0538,
+   "flip": false
+  },
+  {
+   "prompt": "def wrapper(*args, **kwargs):\n",
+   "ref": 262,
+   "cand": 262,
+   "ref_tok": "   ",
+   "cand_tok": "   ",
+   "margin_ref": 3.954,
+   "kl": 0.0016,
+   "flip": false
+  },
+  {
+   "prompt": "The capital of France is",
+   "ref": 12095,
+   "cand": 12095,
+   "ref_tok": " Paris",
+   "cand_tok": " Paris",
+   "margin_ref": 0.3485,
+   "kl": 0.0433,
+   "flip": false
+  },
+  {
+   "prompt": "The largest planet is",
+   "ref": 49689,
+   "cand": 49689,
+   "ref_tok": " Jupiter",
+   "cand_tok": " Jupiter",
+   "margin_ref": 0.6069,
+   "kl": 0.0589,
+   "flip": false
+  },
+  {
+   "prompt": "Water boils at",
+   "ref": 220,
+   "cand": 220,
+   "ref_tok": " ",
+   "cand_tok": " ",
+   "margin_ref": 3.133,
+   "kl": 0.0251,
+   "flip": false
+  },
+  {
+   "prompt": "The author of Hamlet was",
+   "ref": 264,
+   "cand": 9223,
+   "ref_tok": " a",
+   "cand_tok": " born",
+   "margin_ref": 0.2055,
+   "kl": 0.0806,
+   "flip": true
+  },
+  {
+   "prompt": "Two plus two equals",
+   "ref": 3040,
+   "cand": 2326,
+   "ref_tok": " four",
+   "cand_tok": " three",
+   "margin_ref": 0.1861,
+   "kl": 0.1132,
+   "flip": true
+  },
+  {
+   "prompt": "The sun rises in the",
+   "ref": 10984,
+   "cand": 10984,
+   "ref_tok": " east",
+   "cand_tok": " east",
+   "margin_ref": 1.582,
+   "kl": 0.0942,
+   "flip": false
+  },
+  {
+   "prompt": "Machine learning is a field of",
+   "ref": 6366,
+   "cand": 6366,
+   "ref_tok": " computer",
+   "cand_tok": " computer",
+   "margin_ref": 0.3346,
+   "kl": 0.0149,
+   "flip": false
+  },
+  {
+   "prompt": "The first president of the United States was",
+   "ref": 9857,
+   "cand": 9857,
+   "ref_tok": " George",
+   "cand_tok": " George",
+   "margin_ref": 0.0091,
+   "kl": 0.2175,
+   "flip": false
+  },
+  {
+   "prompt": "A triangle has",
+   "ref": 11067,
+   "cand": 11067,
+   "ref_tok": " sides",
+   "cand_tok": " sides",
+   "margin_ref": 0.3155,
+   "kl": 0.1207,
+   "flip": false
+  },
+  {
+   "prompt": "The chemical symbol for gold is",
+   "ref": 32050,
+   "cand": 32050,
+   "ref_tok": " Au",
+   "cand_tok": " Au",
+   "margin_ref": 3.0585,
+   "kl": 0.0187,
+   "flip": false
+  },
+  {
+   "prompt": "The year 1969 saw",
+   "ref": 279,
+   "cand": 279,
+   "ref_tok": " the",
+   "cand_tok": " the",
+   "margin_ref": 1.6839,
+   "kl": 0.0083,
+   "flip": false
+  },
+  {
+   "prompt": "In Python, a list is",
+   "ref": 264,
+   "cand": 264,
+   "ref_tok": " a",
+   "cand_tok": " a",
+   "margin_ref": 1.8309,
+   "kl": 0.0091,
+   "flip": false
+  },
+  {
+   "prompt": "The quick brown fox",
+   "ref": 34208,
+   "cand": 34208,
+   "ref_tok": " jumps",
+   "cand_tok": " jumps",
+   "margin_ref": 0.6681,
+   "kl": 0.1485,
+   "flip": false
+  },
+  {
+   "prompt": "Once upon a time",
+   "ref": 11,
+   "cand": 11,
+   "ref_tok": ",",
+   "cand_tok": ",",
+   "margin_ref": 1.9442,
+   "kl": 0.0122,
+   "flip": false
+  },
+  {
+   "prompt": "The theory of relativity was proposed by",
+   "ref": 17513,
+   "cand": 17513,
+   "ref_tok": " Albert",
+   "cand_tok": " Albert",
+   "margin_ref": 1.417,
+   "kl": 0.0784,
+   "flip": false
+  },
+  {
+   "prompt": "Photosynthesis converts",
+   "ref": 3100,
+   "cand": 3100,
+   "ref_tok": " light",
+   "cand_tok": " light",
+   "margin_ref": 0.4587,
+   "kl": 0.1251,
+   "flip": false
+  }
+ ],
+ "null_control": {
+  "flip_rate": 0.0,
+  "ci95_low": 0.0,
+  "ci95_high": 0.0857,
+  "flips": 0
+ }
+}

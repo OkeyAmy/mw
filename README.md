@@ -107,6 +107,44 @@ tokens, re-feeding the last one duplicates a token already in the KV cache and
 corrupts every later step. The loop now keeps the injection forward's logits
 instead of re-feeding.
 
+## Certificate: what did quantisation change?
+
+```bash
+PYTHONPATH=code python -m mw.certify \
+  --reference .hf/bf16-hf --candidate .hf/q4km-hf \
+  --builtin 41 --null-control --out proof/cert_qwen_q4
+```
+
+It compares **next-token decisions**, not benchmark averages, and prints the
+null control (same model, other dtype) so the result has a floor.
+
+First run, Qwen2.5-Coder-1.5B bf16 vs Q4_K_M, 41 unique prompts:
+
+| metric | value |
+|---|---|
+| decisions flipped | **2 / 41 (4.9%)** |
+| 95% CI | [1.4%, 16.1%] |
+| confident flips (ref margin > 1 nat) | **0** |
+| mean KL / max KL | 0.042 / 0.218 |
+| null control (fp32 vs bf16) | **0.0%** [0%, 8.6%] |
+
+The two flips:
+
+| prompt | bf16 | Q4_K_M | ref margin |
+|---|---|---|---|
+| `Two plus two equals` | ` four` | ` three` | 0.19 |
+| `The author of Hamlet was` | ` a` | ` born` | 0.21 |
+
+**What this does not say.** It is *not certifiable* at a 5% gate: with 41 unique
+prompts the 95% upper bound is 16.1%. And because the null control's upper bound
+(8.6%) is wider than the observed flip rate (4.9%), we **cannot claim
+quantisation caused those flips** rather than precision noise. Both flipped on
+near-ties (margin < 0.25 nat).
+
+The null control here is fp32-vs-bf16 because this checkpoint is bf16 and a
+bf16→fp16 cast overflows; the fp16 storage floor C1 measured (3.4–6.7%) cannot
+be reproduced on this model. That limitation is part of the certificate.
+
 ## Memory safety (read this)
 
 Loading a model can freeze a laptop if it does not fit. This package refuses
