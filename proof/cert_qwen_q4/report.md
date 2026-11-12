@@ -8,6 +8,8 @@
 | metric | value |
 |---|---|
 | decisions flipped | **2 / 41** (4.9%) |
+| meaningful decisions (no whitespace/punctuation) | **2 / 18** (11.1%) [3.1%, 32.8%] |
+| trivial decisions excluded | 23 |
 | 95% CI on flip rate | [1.4%, 16.1%] |
 | confident flips (ref margin > 1 nat) | **0** |
 | mean KL(ref‖cand) | 0.0420 |
@@ -15,6 +17,19 @@
 | **null control** (same model, other dtype) | **0.0%** flips [0.0%, 8.6%] |
 
 > The null control is the floor: a same-model dtype conversion already flips 0.0% of decisions. Any candidate flip rate at or below this is indistinguishable from storage format.
+
+## By decision class
+
+| class | decisions | flips | rate |
+|---|---|---|---|
+| `prose` | 14 | 2 | 14.3% |
+| `whitespace` | 22 | 0 | 0.0% |
+| `keyword` | 2 | 0 | 0.0% |
+| `identifier` | 1 | 0 | 0.0% |
+| `comment` | 1 | 0 | 0.0% |
+| `punctuation` | 1 | 0 | 0.0% |
+
+> Classes are heuristic, from the flipped token string. The authoritative grouping is the prompt that declared the decision.
 
 ## Gate
 

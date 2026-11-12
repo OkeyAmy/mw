@@ -1,5 +1,12 @@
 {
  "n_prompts": 41,
+ "meaningful": {
+  "n": 18,
+  "flips": 2,
+  "flip_rate": 0.1111,
+  "ci95_low": 0.031,
+  "ci95_high": 0.328
+ },
  "n_unique": 41,
  "duplicates": 0,
  "flips": 2,
@@ -9,6 +16,44 @@
  "confident_flips": 0,
  "max_kl": 0.2175,
  "mean_kl": 0.042,
+ "by_class": [
+  {
+   "class": "prose",
+   "n": 14,
+   "flips": 2,
+   "rate": 0.1429
+  },
+  {
+   "class": "whitespace",
+   "n": 22,
+   "flips": 0,
+   "rate": 0.0
+  },
+  {
+   "class": "keyword",
+   "n": 2,
+   "flips": 0,
+   "rate": 0.0
+  },
+  {
+   "class": "identifier",
+   "n": 1,
+   "flips": 0,
+   "rate": 0.0
+  },
+  {
+   "class": "comment",
+   "n": 1,
+   "flips": 0,
+   "rate": 0.0
+  },
+  {
+   "class": "punctuation",
+   "n": 1,
+   "flips": 0,
+   "rate": 0.0
+  }
+ ],
  "rows": [
   {
    "prompt": "def add(a, b):\n",
@@ -18,7 +63,10 @@
    "cand_tok": "   ",
    "margin_ref": 1.9609,
    "kl": 0.0125,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "def merge(a, b):\n",
@@ -28,7 +76,10 @@
    "cand_tok": "   ",
    "margin_ref": 3.9718,
    "kl": 0.0071,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "class Cache:\n",
@@ -38,7 +89,10 @@
    "cand_tok": "   ",
    "margin_ref": 3.5148,
    "kl": 0.0025,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "async def fetch(url):\n",
@@ -48,7 +102,10 @@
    "cand_tok": "   ",
    "margin_ref": 2.8684,
    "kl": 0.0059,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "def parse(x):\n",
@@ -58,7 +115,10 @@
    "cand_tok": "   ",
    "margin_ref": 3.1989,
    "kl": 0.005,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "with open(path) as fh:\n",
@@ -68,7 +128,10 @@
    "cand_tok": "   ",
    "margin_ref": 3.172,
    "kl": 0.0106,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "while queue:\n",
@@ -78,7 +141,10 @@
    "cand_tok": "   ",
    "margin_ref": 3.137,
    "kl": 0.0137,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "def to_json(obj):\n",
@@ -88,7 +154,10 @@
    "cand_tok": "   ",
    "margin_ref": 4.1512,
    "kl": 0.005,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "for k, v in d.items():\n",
@@ -98,7 +167,10 @@
    "cand_tok": "   ",
    "margin_ref": 3.0104,
    "kl": 0.0122,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "def main():\n",
@@ -108,7 +180,10 @@
    "cand_tok": "   ",
    "margin_ref": 3.9585,
    "kl": 0.0033,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "try:\n",
@@ -118,7 +193,10 @@
    "cand_tok": "   ",
    "margin_ref": 3.3419,
    "kl": 0.0078,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "import os\n",
@@ -128,7 +206,10 @@
    "cand_tok": "import",
    "margin_ref": 1.3348,
    "kl": 0.0084,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "keyword",
+   "cand_class": "keyword"
   },
   {
    "prompt": "return {\n",
@@ -138,7 +219,10 @@
    "cand_tok": " ",
    "margin_ref": 0.2269,
    "kl": 0.0299,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "if __name__ == '__main__':\n",
@@ -148,7 +232,10 @@
    "cand_tok": "   ",
    "margin_ref": 4.5569,
    "kl": 0.0033,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "def __init__(self, x):\n",
@@ -158,7 +245,10 @@
    "cand_tok": "   ",
    "margin_ref": 1.8841,
    "kl": 0.012,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "raise ValueError(\n",
@@ -168,7 +258,10 @@
    "cand_tok": "   ",
    "margin_ref": 2.2412,
    "kl": 0.0116,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "for i in range(10):\n",
@@ -178,7 +271,10 @@
    "cand_tok": "   ",
    "margin_ref": 3.4873,
    "kl": 0.0028,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "print(f\"{x}\")\n",
@@ -188,7 +284,10 @@
    "cand_tok": "print",
    "margin_ref": 1.0069,
    "kl": 0.0668,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "identifier",
+   "cand_class": "identifier"
   },
   {
    "prompt": "def fib(n):\n    return n if n < 2 else\n",
@@ -198,7 +297,10 @@
    "cand_tok": "       ",
    "margin_ref": 0.308,
    "kl": 0.012,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "sorted(items, key=lambda x:\n",
@@ -208,7 +310,10 @@
    "cand_tok": "           ",
    "margin_ref": 0.3008,
    "kl": 0.0245,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "with lock:\n",
@@ -218,7 +323,10 @@
    "cand_tok": "   ",
    "margin_ref": 1.3072,
    "kl": 0.0218,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "assert isinstance(x, int)\n",
@@ -228,7 +336,10 @@
    "cand_tok": "assert",
    "margin_ref": 2.5719,
    "kl": 0.1032,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "keyword",
+   "cand_class": "keyword"
   },
   {
    "prompt": "yield from gen()\n",
@@ -238,7 +349,10 @@
    "cand_tok": "#",
    "margin_ref": 0.4126,
    "kl": 0.1142,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "comment",
+   "cand_class": "comment"
   },
   {
    "prompt": "lambda x: x + 1\n",
@@ -248,7 +362,10 @@
    "cand_tok": "   ",
    "margin_ref": 0.3242,
    "kl": 0.0538,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "def wrapper(*args, **kwargs):\n",
@@ -258,7 +375,10 @@
    "cand_tok": "   ",
    "margin_ref": 3.954,
    "kl": 0.0016,
-   "flip": false
+   "flip": false,
+   "declared": "code",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "The capital of France is",
@@ -268,7 +388,10 @@
    "cand_tok": " Paris",
    "margin_ref": 0.3485,
    "kl": 0.0433,
-   "flip": false
+   "flip": false,
+   "declared": "prose",
+   "class": "prose",
+   "cand_class": "prose"
   },
   {
    "prompt": "The largest planet is",
@@ -278,7 +401,10 @@
    "cand_tok": " Jupiter",
    "margin_ref": 0.6069,
    "kl": 0.0589,
-   "flip": false
+   "flip": false,
+   "declared": "prose",
+   "class": "prose",
+   "cand_class": "prose"
   },
   {
    "prompt": "Water boils at",
@@ -288,7 +414,10 @@
    "cand_tok": " ",
    "margin_ref": 3.133,
    "kl": 0.0251,
-   "flip": false
+   "flip": false,
+   "declared": "prose",
+   "class": "whitespace",
+   "cand_class": "whitespace"
   },
   {
    "prompt": "The author of Hamlet was",
@@ -298,7 +427,10 @@
    "cand_tok": " born",
    "margin_ref": 0.2055,
    "kl": 0.0806,
-   "flip": true
+   "flip": true,
+   "declared": "prose",
+   "class": "prose",
+   "cand_class": "prose"
   },
   {
    "prompt": "Two plus two equals",
@@ -308,7 +440,10 @@
    "cand_tok": " three",
    "margin_ref": 0.1861,
    "kl": 0.1132,
-   "flip": true
+   "flip": true,
+   "declared": "prose",
+   "class": "prose",
+   "cand_class": "prose"
   },
   {
    "prompt": "The sun rises in the",
@@ -318,7 +453,10 @@
    "cand_tok": " east",
    "margin_ref": 1.582,
    "kl": 0.0942,
-   "flip": false
+   "flip": false,
+   "declared": "prose",
+   "class": "prose",
+   "cand_class": "prose"
   },
   {
    "prompt": "Machine learning is a field of",
@@ -328,7 +466,10 @@
    "cand_tok": " computer",
    "margin_ref": 0.3346,
    "kl": 0.0149,
-   "flip": false
+   "flip": false,
+   "declared": "prose",
+   "class": "prose",
+   "cand_class": "prose"
   },
   {
    "prompt": "The first president of the United States was",
@@ -338,7 +479,10 @@
    "cand_tok": " George",
    "margin_ref": 0.0091,
    "kl": 0.2175,
-   "flip": false
+   "flip": false,
+   "declared": "prose",
+   "class": "prose",
+   "cand_class": "prose"
   },
   {
    "prompt": "A triangle has",
@@ -348,7 +492,10 @@
    "cand_tok": " sides",
    "margin_ref": 0.3155,
    "kl": 0.1207,
-   "flip": false
+   "flip": false,
+   "declared": "prose",
+   "class": "prose",
+   "cand_class": "prose"
   },
   {
    "prompt": "The chemical symbol for gold is",
@@ -358,7 +505,10 @@
    "cand_tok": " Au",
    "margin_ref": 3.0585,
    "kl": 0.0187,
-   "flip": false
+   "flip": false,
+   "declared": "prose",
+   "class": "prose",
+   "cand_class": "prose"
   },
   {
    "prompt": "The year 1969 saw",
@@ -368,7 +518,10 @@
    "cand_tok": " the",
    "margin_ref": 1.6839,
    "kl": 0.0083,
-   "flip": false
+   "flip": false,
+   "declared": "prose",
+   "class": "prose",
+   "cand_class": "prose"
   },
   {
    "prompt": "In Python, a list is",
@@ -378,7 +531,10 @@
    "cand_tok": " a",
    "margin_ref": 1.8309,
    "kl": 0.0091,
-   "flip": false
+   "flip": false,
+   "declared": "prose",
+   "class": "prose",
+   "cand_class": "prose"
   },
   {
    "prompt": "The quick brown fox",
@@ -388,7 +544,10 @@
    "cand_tok": " jumps",
    "margin_ref": 0.6681,
    "kl": 0.1485,
-   "flip": false
+   "flip": false,
+   "declared": "prose",
+   "class": "prose",
+   "cand_class": "prose"
   },
   {
    "prompt": "Once upon a time",
@@ -398,7 +557,10 @@
    "cand_tok": ",",
    "margin_ref": 1.9442,
    "kl": 0.0122,
-   "flip": false
+   "flip": false,
+   "declared": "prose",
+   "class": "punctuation",
+   "cand_class": "punctuation"
   },
   {
    "prompt": "The theory of relativity was proposed by",
@@ -408,7 +570,10 @@
    "cand_tok": " Albert",
    "margin_ref": 1.417,
    "kl": 0.0784,
-   "flip": false
+   "flip": false,
+   "declared": "prose",
+   "class": "prose",
+   "cand_class": "prose"
   },
   {
    "prompt": "Photosynthesis converts",
@@ -418,7 +583,10 @@
    "cand_tok": " light",
    "margin_ref": 0.4587,
    "kl": 0.1251,
-   "flip": false
+   "flip": false,
+   "declared": "prose",
+   "class": "prose",
+   "cand_class": "prose"
   }
  ],
  "null_control": {

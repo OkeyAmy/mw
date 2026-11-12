@@ -75,6 +75,55 @@ def build_prompts(n: int) -> list[str]:
     return [base[i % len(base)] for i in range(n)]
 
 
+# --- decision classes (C1 moat: "7 tool-call decisions flipped" beats "4.9%") --
+KEYWORDS = {
+    "def", "class", "return", "if", "else", "elif", "for", "while", "try",
+    "except", "finally", "import", "from", "as", "with", "yield", "lambda",
+    "pass", "raise", "assert", "async", "await", "in", "is", "not", "and",
+    "or", "None", "True", "False", "break", "continue", "global", "del",
+}
+PUNCT = set("{}[]():,.;=+-*/<>!&|%@^~\\")
+
+
+def declared_class(prompt: str) -> str:
+    """What the prompt is testing, declared before the run."""
+    if prompt in PROMPTS_CODE:
+        return "code"
+    if prompt in PROMPTS_TEXT:
+        return "prose"
+    return "custom"
+
+
+def looks_like_code(prompt: str) -> bool:
+    return prompt in PROMPTS_CODE or any(c in prompt for c in "{}();=") \
+        or prompt.lstrip().startswith(("#", "def ", "class ", "import "))
+
+
+def classify_token(token: str, prompt: str) -> str:
+    """Best-effort class of a *flipped* decision, from the token string only.
+
+    This is descriptive, not authoritative: a token can be an identifier in one
+    context and prose in another. The authoritative grouping is the declared
+    prompt class; this refines within it.
+    """
+    s = token.strip()
+    if not s:
+        return "whitespace"
+    if s.startswith("#"):
+        return "comment"
+    if s in KEYWORDS:
+        return "keyword"
+    if s[0] in PUNCT:
+        return "punctuation"
+    if s[0] in "\"'`":
+        return "string"
+    if s[0].isdigit() or (len(s) > 1 and s[0] in "-." and s[1].isdigit()):
+        return "number"
+    if s[0].isalpha() or s[0] == "_":
+        return "identifier" if looks_like_code(prompt) else "prose"
+    return "other"
+
+
 def tokenizer_fingerprint(tok) -> str:
     vocab = tok.get_vocab()
     h = hashlib.sha256()
@@ -180,7 +229,10 @@ def compare(ref_lp, ref_meta, cand_lp, cand_meta) -> dict:
         row = {"prompt": ra["prompt"], "ref": ia, "cand": ib,
                "ref_tok": ra["argmax_tok"], "cand_tok": rb["argmax_tok"],
                "margin_ref": round(float(ra["margin"]), 4), "kl": round(kl, 4),
-               "flip": ia != ib}
+               "flip": ia != ib,
+               "declared": declared_class(ra["prompt"]),
+               "class": classify_token(ra["argmax_tok"], ra["prompt"]),
+               "cand_class": classify_token(rb["argmax_tok"], ra["prompt"])}
         rows.append(row)
         if ia != ib:
             flips.append(row)
@@ -189,8 +241,37 @@ def compare(ref_lp, ref_meta, cand_lp, cand_meta) -> dict:
 
     lo, hi = wilson(len(flips), n)
     unique = len({r["prompt"] for r in rows})
+
+    by_class: dict[str, dict[str, int]] = {}
+    for r in rows:
+        c = r["class"]
+        slot = by_class.setdefault(c, {"n": 0, "flips": 0})
+        slot["n"] += 1
+        if r["flip"]:
+            slot["flips"] += 1
+    by_class_rows = [
+        {"class": c, "n": v["n"], "flips": v["flips"],
+         "rate": round(v["flips"] / v["n"], 4)}
+        for c, v in sorted(by_class.items(), key=lambda kv: -kv[1]["flips"])
+    ]
+
+    # Whitespace/punctuation are decisions, but they are not interesting ones:
+    # the model's top choice after a code prompt is often "\n" or " ". Report the
+    # meaningful subset separately so a high whitespace share cannot dilute the rate.
+    trivial_classes = {"whitespace", "punctuation"}
+    meaningful = [r for r in rows if r["class"] not in trivial_classes]
+    m_flips = [r for r in meaningful if r["flip"]]
+    m_lo, m_hi = wilson(len(m_flips), len(meaningful))
+
     return {
         "n_prompts": n,
+        "meaningful": {
+            "n": len(meaningful),
+            "flips": len(m_flips),
+            "flip_rate": round(len(m_flips) / max(len(meaningful), 1), 4),
+            "ci95_low": round(m_lo, 4),
+            "ci95_high": round(m_hi, 4),
+        },
         "n_unique": unique,
         "duplicates": n - unique,
         "flips": len(flips),
@@ -200,6 +281,7 @@ def compare(ref_lp, ref_meta, cand_lp, cand_meta) -> dict:
         "confident_flips": len(risky),
         "max_kl": round(max((r["kl"] for r in rows), default=0.0), 4),
         "mean_kl": round(float(np.mean([r["kl"] for r in rows])) if rows else 0.0, 4),
+        "by_class": by_class_rows,
         "rows": rows,
     }
 
@@ -220,6 +302,12 @@ def render(res: dict, ref: str, cand: str, threshold: float,
         "| metric | value |",
         "|---|---|",
         f"| decisions flipped | **{res['flips']} / {res['n_prompts']}** ({res['flip_rate']:.1%}) |",
+        (f"| meaningful decisions (no whitespace/punctuation) | "
+         f"**{res['meaningful']['flips']} / {res['meaningful']['n']}** "
+         f"({res['meaningful']['flip_rate']:.1%}) "
+         f"[{res['meaningful']['ci95_low']:.1%}, {res['meaningful']['ci95_high']:.1%}] |"),
+        (f"| trivial decisions excluded | "
+         f"{res['n_prompts'] - res['meaningful']['n']} |"),
         f"| 95% CI on flip rate | [{res['ci95_low']:.1%}, {res['ci95_high']:.1%}] |",
         f"| confident flips (ref margin > 1 nat) | **{res['confident_flips']}** |",
         f"| mean KL(ref‖cand) | {res['mean_kl']:.4f} |",
@@ -235,6 +323,15 @@ def render(res: dict, ref: str, cand: str, threshold: float,
              f"flips {null_res['flip_rate']:.1%} of decisions. Any candidate flip rate "
              "at or below this is indistinguishable from storage format."),
         ]
+    if res.get("by_class"):
+        lines += ["", "## By decision class", "",
+                  "| class | decisions | flips | rate |", "|---|---|---|---|"]
+        for b in res["by_class"]:
+            lines.append(f"| `{b['class']}` | {b['n']} | {b['flips']} | {b['rate']:.1%} |")
+        lines.append("")
+        lines.append("> Classes are heuristic, from the flipped token string. The "
+                     "authoritative grouping is the prompt that declared the decision.")
+
     lines += [
         "",
         "## Gate",
@@ -278,6 +375,9 @@ def main() -> int:
                          "the dtype noise floor")
     ap.add_argument("--null-dtype", default="bfloat16", choices=list(TORCH_DTYPES))
     ap.add_argument("--out", default="proof/cert")
+    ap.add_argument("--from-cache", action="store_true",
+                    help="rebuild the report from ref.npz/cand.npz without loading "
+                         "any model (useful after changing the report logic)")
     args = ap.parse_args()
 
     if args.prompts:
@@ -290,17 +390,30 @@ def main() -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
 
-    print(f"[cert] {len(prompts)} prompts "
-          f"({len(set(prompts))} unique)", file=sys.stderr)
-    print("[cert] reference pass", file=sys.stderr)
-    ref_lp, ref_meta = measure(args.reference, prompts, args.dtype, out / "ref.npz")
-    print("[cert] candidate pass", file=sys.stderr)
-    cand_lp, cand_meta = measure(args.candidate, prompts, args.dtype, out / "cand.npz")
+    if args.from_cache:
+        d_ref = np.load(out / "ref.npz", allow_pickle=True)
+        d_cand = np.load(out / "cand.npz", allow_pickle=True)
+        ref_lp, ref_meta = d_ref["logp"], json.loads(str(d_ref["meta"]))
+        cand_lp, cand_meta = d_cand["logp"], json.loads(str(d_cand["meta"]))
+        print(f"[cert] from cache: {len(ref_meta)} prompts", file=sys.stderr)
+    else:
+        print(f"[cert] {len(prompts)} prompts "
+              f"({len(set(prompts))} unique)", file=sys.stderr)
+        print("[cert] reference pass", file=sys.stderr)
+        ref_lp, ref_meta = measure(args.reference, prompts, args.dtype, out / "ref.npz")
+        print("[cert] candidate pass", file=sys.stderr)
+        cand_lp, cand_meta = measure(args.candidate, prompts, args.dtype, out / "cand.npz")
 
     res = compare(ref_lp, ref_meta, cand_lp, cand_meta)
 
     null_res = None
-    if args.null_control and args.null_dtype != args.dtype:
+    if args.from_cache and (out / f"null_{args.null_dtype}.npz").exists():
+        d_null = np.load(out / f"null_{args.null_dtype}.npz", allow_pickle=True)
+        null_res = compare(ref_lp, ref_meta, d_null["logp"],
+                           json.loads(str(d_null["meta"])))
+        res["null_control"] = {k: null_res[k] for k in
+                               ("flip_rate", "ci95_low", "ci95_high", "flips")}
+    elif args.null_control and not args.from_cache and args.null_dtype != args.dtype:
         print(f"[cert] null control: reference in {args.null_dtype}", file=sys.stderr)
         n_lp, n_meta = measure(args.reference, prompts, args.null_dtype,
                                out / f"null_{args.null_dtype}.npz")

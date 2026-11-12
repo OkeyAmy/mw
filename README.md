@@ -231,13 +231,21 @@ First run, 41 unique prompts:
 | metric | value |
 |---|---|
 | decisions flipped | 2/41 (4.9%) |
-| 95% CI | [1.4%, 16.1%] |
+| **meaningful decisions** (no whitespace/punctuation) | **2/18 (11.1%)** [3.1%, 32.8%] |
+| trivial decisions excluded | 23 |
+| 95% CI (all) | [1.4%, 16.1%] |
 | confident flips | 0 |
 | mean / max KL | 0.042 / 0.218 |
 | null control (fp32 vs bf16) | 0.0% [0%, 8.6%] |
 
 The two flips: `Two plus two equals` → **` three`**, and `The author of Hamlet
 was` → ` born`. Both were near-ties (< 0.25 nat).
+
+**The by-class table found a flaw in our own suite.** 22 of 41 decisions were
+whitespace — after a code prompt the model's top choice is often `\n` or a space
+— so the headline 4.9% was diluted. Excluding whitespace and punctuation, the
+rate is **11.1%** on 18 real decisions. A certificate is only as meaningful as
+the decisions it declares; the suite, not the model, was the weak part.
 
 **It does not certify at 5%**: with 41 unique prompts the upper bound is 16.1%,
 and the null control's bound (8.6%) is wider than the observed rate, so the
@@ -255,9 +263,6 @@ upper bound on zero flips); 384 narrows it to ~1%.
   neuron is an index, not a word.
 - **The 3-D view is a projection.** `z` is layer order (real); `x/y` are PCA.
   Variance explained is printed because it matters.
-- **API-only models are out of scope.** No hidden states, so no trace. Whether
-  internals can be recovered from logits is unsettled; partial recovery is
-  published, full mechanism is not.
 - **Steering is not solved.** See C4 above.
 - **Long context is not tested.** 32k is configured; nothing here validates it.
 
