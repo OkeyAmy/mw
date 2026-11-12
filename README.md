@@ -309,6 +309,13 @@ tests/           116 tests (fast: no model; slow: real weights)
 proof/           artifacts (certificates, proof chain, sanity)
 ```
 
+## Where the research lives
+
+Validation, the proof chain and the research ledger are on the **`research`**
+branch (`git checkout research`), not on `main`. `main` ships the instrument,
+the app and the artefacts; the branch carries the evidence trail, the failed
+hypotheses and the audit reports.
+
 ## License
 
 MIT. Model weights keep their own licences.
