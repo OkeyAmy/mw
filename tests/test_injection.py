@@ -210,6 +210,7 @@ def test_granite_token_count_drops_from_67_to_18():
     import sys
     sys.path.insert(0, str(ROOT / "app"))
     from transformers import AutoTokenizer
+
     from app.server import LiveAdapter as LA
 
     tok = AutoTokenizer.from_pretrained(str(path))
