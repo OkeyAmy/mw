@@ -247,6 +247,36 @@ whitespace — after a code prompt the model's top choice is often `\n` or a spa
 rate is **11.1%** on 18 real decisions. A certificate is only as meaningful as
 the decisions it declares; the suite, not the model, was the weak part.
 
+### v2 suite, 96 unique prompts
+
+```
+decisions flipped        21 / 96   (21.9%)   CI [14.8%, 31.1%]
+meaningful               19 / 76   (25.0%)   CI [16.6%, 35.8%]
+null control (fp32/bf16)  6.2%     [2.9%, 13.0%]
+confident flips           2
+mean / max KL             0.154 / 1.319
+```
+
+The flip rate is now **well above the 6.2% dtype floor**, so the changes are
+attributable to quantisation rather than precision. By class, identifiers are
+the worst hit:
+
+| class | decisions | flips | rate |
+|---|---|---|---|
+| `identifier` | 34 | 11 | **32.4%** |
+| `prose` | 26 | 6 | 23.1% |
+| `string` | 10 | 1 | 10.0% |
+| `number` | 3 | 1 | 33.3% |
+
+**A concrete artifact:** in 3 of 21 flips the Q4 build emitted a raw FIM control
+token (`<|fim_suffix|>`) where bf16 produced text — e.g. `except Excepti` →
+`<|fim_suffix|>`, `{"user_na` → `<|fim_suffix|>`. That is not a style change; it
+is a quantised model leaking training-time control tokens into output.
+
+And code identifiers: `def calculate_tot` → `ale` (bf16) vs `_price` (Q4),
+`import nump` → `ypy` vs ` as`. A quarter of identifier decisions change, which
+is exactly the kind of regression a benchmark average hides.
+
 **It does not certify at 5%**: with 41 unique prompts the upper bound is 16.1%,
 and the null control's bound (8.6%) is wider than the observed rate, so the
 flips cannot be attributed to quantisation rather than precision noise. The tool
