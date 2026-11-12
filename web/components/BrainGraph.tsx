@@ -42,6 +42,8 @@ interface NodeView {
   r: number;
   hot: number;
   hasData: boolean;
+  alpha: number;
+  pulse: number;
 }
 
 interface Particle {
@@ -89,9 +91,18 @@ export function BrainGraph({
   const hoverRef = useRef<NodeView | null>(null);
   const dirtyRef = useRef(true);
   const targetsRef = useRef<NodeView[]>([]);
-  const animRef = useRef<Map<string, { from: NodeView; to: NodeView; start: number }>>(
-    new Map(),
-  );
+  const animRef = useRef<
+    Map<
+      string,
+      {
+        from: NodeView;
+        to: NodeView;
+        start: number;
+        dur: number;
+        kind: "move" | "enter" | "exit";
+      }
+    >
+  >(new Map());
   const nowNodesRef = useRef<NodeView[]>([]);
 
   const [size, setSize] = useState({ w: 640, h: 420 });
@@ -156,6 +167,8 @@ export function BrainGraph({
           r: 2.5,
           hot: 0,
           hasData: false,
+          alpha: 1,
+          pulse: 0,
         });
         continue;
       }
@@ -178,6 +191,8 @@ export function BrainGraph({
           r: 1.8 + 5.4 * clamp(layer.norm / maxNorm, 0, 1),
           hot: clamp(Math.abs(value) / maxAbs, 0, 1),
           hasData: true,
+          alpha: 1,
+          pulse: 0,
         });
       });
     }
@@ -187,28 +202,29 @@ export function BrainGraph({
   const stepNodes = useCallback((now: number): NodeView[] => {
     const map = animRef.current;
     if (map.size === 0) return nowNodesRef.current;
-    const out: NodeView[] = [];
-    let active = false;
-    for (const target of targetsRef.current) {
-      const a = map.get(nodeKey(target));
-      if (!a) {
-        out.push(target);
-        continue;
-      }
-      const k = Math.min(1, Math.max(0, (now - a.start) / 280));
-      if (k < 1) active = true;
+    const current = new Map(nowNodesRef.current.map((n) => [nodeKey(n), n]));
+    for (const [key, a] of map) {
+      const k = Math.min(1, Math.max(0, (now - a.start) / a.dur));
       const e = easeOut(k);
-      out.push({
-        ...target,
+      const merged: NodeView = {
+        ...a.to,
         x: a.from.x + (a.to.x - a.from.x) * e,
         y: a.from.y + (a.to.y - a.from.y) * e,
         r: a.from.r + (a.to.r - a.from.r) * e,
         hot: a.from.hot + (a.to.hot - a.from.hot) * e,
-      });
+        alpha: a.from.alpha + (a.to.alpha - a.from.alpha) * e,
+        pulse: a.from.pulse + (a.to.pulse - a.from.pulse) * e,
+      };
+      if (k >= 1) {
+        map.delete(key);
+        if (a.kind === "exit") current.delete(key);
+        else current.set(key, merged);
+      } else {
+        current.set(key, merged);
+      }
     }
-    if (!active) map.clear();
-    nowNodesRef.current = out;
-    return out;
+    nowNodesRef.current = [...current.values()];
+    return nowNodesRef.current;
   }, []);
 
   // ------------------------------------------------------------------ draw ---
@@ -357,6 +373,19 @@ export function BrainGraph({
         const past = traces[i];
         if (past) tracePath(past, 0.15, 1);
       }
+      for (let i = Math.max(0, activeIndex - 3); i < activeIndex; i += 1) {
+        const past = traces[i];
+        if (!past) continue;
+        for (const layer of past.layers) {
+          if (layer.neurons.length === 0) continue;
+          const logNorm = clamp(Math.log1p(Math.abs(layer.neurons[0][1])) / logMax, 0, 1);
+          const y = layout.midY + (0.5 - logNorm) * band;
+          ctx.beginPath();
+          ctx.arc(colX(layer.l), y, 1.4, 0, Math.PI * 2);
+          ctx.fillStyle = `${accent}0.15)`;
+          ctx.fill();
+        }
+      }
       tracePath(trace, 0.5, 1.3);
 
       // adjacency edges (structure, not weights)
@@ -365,22 +394,27 @@ export function BrainGraph({
         const to = byLayer.get(l + 1) ?? [];
         for (const a of from) {
           for (const b of to) {
+            const edgeAlpha = 0.09 * Math.min(a.alpha, b.alpha);
+            if (edgeAlpha < 0.01) continue;
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
             ctx.lineTo(b.x, b.y);
-            ctx.strokeStyle = `${accent}0.09)`;
+            ctx.strokeStyle = `${accent}${edgeAlpha})`;
             ctx.lineWidth = 0.6;
             ctx.stroke();
           }
         }
         const skipTo = byLayer.get(l + 2);
         if (from.length > 0 && skipTo && skipTo.length > 0) {
-          ctx.beginPath();
-          ctx.moveTo(from[0].x, from[0].y);
-          ctx.lineTo(skipTo[0].x, skipTo[0].y);
-          ctx.strokeStyle = `${accent}0.03)`;
-          ctx.lineWidth = 0.5;
-          ctx.stroke();
+          const edgeAlpha = 0.03 * Math.min(from[0].alpha, skipTo[0].alpha);
+          if (edgeAlpha > 0.005) {
+            ctx.beginPath();
+            ctx.moveTo(from[0].x, from[0].y);
+            ctx.lineTo(skipTo[0].x, skipTo[0].y);
+            ctx.strokeStyle = `${accent}${edgeAlpha})`;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          }
         }
       }
 
@@ -430,19 +464,23 @@ export function BrainGraph({
 
       // nodes
       for (const n of nodes) {
+        if (n.alpha <= 0.02) continue;
         if (!n.hasData) {
           ctx.beginPath();
           ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-          ctx.strokeStyle = `${muted}0.5)`;
+          ctx.strokeStyle = `${muted}${0.5 * n.alpha})`;
           ctx.lineWidth = 1;
           ctx.stroke();
           continue;
         }
+        // pulse: rises flash brighter, falls dim, then it eases back to normal
+        const pulseHot = n.pulse > 0 ? n.hot + n.pulse * 0.45 : n.hot * (1 + n.pulse * 0.45);
+        const hot = clamp(pulseHot, 0, 1);
         ctx.beginPath();
         ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(159,232,200,${0.18 + n.hot * 0.72})`;
+        ctx.fillStyle = `rgba(159,232,200,${(0.18 + hot * 0.72) * n.alpha})`;
         ctx.fill();
-        ctx.strokeStyle = `rgba(159,232,200,${0.3 + n.hot * 0.6})`;
+        ctx.strokeStyle = `rgba(159,232,200,${(0.3 + hot * 0.6) * n.alpha})`;
         ctx.lineWidth = 0.8;
         ctx.stroke();
 
@@ -476,22 +514,75 @@ export function BrainGraph({
     ],
   );
 
-  // On every token, keep the previous frame's interpolated values and ease to
-  // the new ones over 280 ms. Nothing is rebuilt; the same arrays are mutated.
+  // On every token, diff against the previous token by neuron index: present
+  // neurons move, dropped neurons fade out in place, new ones fade in, and the
+  // rise/fall is carried as a short signed pulse.
   useEffect(() => {
     const targets = buildNodes();
     const now = performance.now();
-    const prev = new Map(nowNodesRef.current.map((n) => [nodeKey(n), n]));
-    const next = new Map<string, { from: NodeView; to: NodeView; start: number }>();
-    for (const t of targets) {
-      next.set(nodeKey(t), { from: prev.get(nodeKey(t)) ?? t, to: t, start: now });
+    const current = new Map(nowNodesRef.current.map((n) => [nodeKey(n), n]));
+    const targetKeys = new Set(targets.map(nodeKey));
+
+    const pulse = new Map<string, number>();
+    const prevTrace = activeIndex > 0 ? traces[activeIndex - 1] : null;
+    if (prevTrace && trace && prevTrace.step === trace.step - 1) {
+      const before = new Map<string, number>();
+      for (const layer of prevTrace.layers) {
+        for (const [idx, v] of layer.neurons) before.set(`${layer.l}:${idx}`, Math.abs(v));
+      }
+      for (const layer of trace.layers) {
+        for (const [idx, v] of layer.neurons) {
+          const old = before.get(`${layer.l}:${idx}`);
+          if (!old || old <= 0) continue;
+          const ratio = Math.abs(v) / old;
+          if (ratio > 1.5) pulse.set(`${layer.l}:${idx}`, 1);
+          else if (ratio < 0.67) pulse.set(`${layer.l}:${idx}`, -1);
+        }
+      }
     }
+
+    const next = new Map<
+      string,
+      { from: NodeView; to: NodeView; start: number; dur: number; kind: "move" | "enter" | "exit" }
+    >();
+    for (const t of targets) {
+      const key = nodeKey(t);
+      const old = current.get(key);
+      if (old) {
+        next.set(key, {
+          from: { ...old, pulse: pulse.get(key) ?? 0 },
+          to: { ...t, pulse: 0 },
+          start: now,
+          dur: 280,
+          kind: "move",
+        });
+      } else {
+        next.set(key, {
+          from: { ...t, alpha: 0, r: t.r * 0.6, pulse: 0 },
+          to: { ...t, alpha: 1, pulse: 0 },
+          start: now,
+          dur: 300,
+          kind: "enter",
+        });
+      }
+    }
+    for (const [key, old] of current) {
+      if (targetKeys.has(key)) continue;
+      next.set(key, {
+        from: old,
+        to: { ...old, alpha: 0, pulse: 0 },
+        start: now,
+        dur: 300,
+        kind: "exit",
+      });
+    }
+
     targetsRef.current = targets;
     animRef.current = next;
-    if (nowNodesRef.current.length === 0) nowNodesRef.current = targets;
+    if (nowNodesRef.current.length === 0) nowNodesRef.current = targets.map((n) => ({ ...n }));
     dirtyRef.current = true;
     draw(performance.now());
-  }, [buildNodes, draw]);
+  }, [buildNodes, draw, activeIndex, traces, trace]);
 
   // redraw on data/layout changes; loop only while particles are alive
   useEffect(() => {
@@ -704,16 +795,16 @@ export function BrainGraph({
 
       <div className="graph-mode">
         {mode === "pca"
-          ? "geometry: x/y = shared PCA of residual · z order = layer"
-          : "x = layer · y = neuron activation · radius = norm · edges = adjacency"}
+          ? "geometry: x/y = shared PCA of residual · layer order preserved"
+          : "x = layer · y = value · r = norm · edges = adjacency · top-k of 8960 per layer (wire sends top-3)"}
       </div>
 
       {noTokens && !pending ? (
         <div className="brain-empty">
           <b>Send a prompt to open the brain</b>
           <p>
-            each generated token lights one column per layer ({layerCount} layers). click a column
-            to open it. try one of these:
+            each token = one forward pass; the pattern is that token&rsquo;s activations. click a
+            column to open it or a node to read its exact numbers. try one of these:
           </p>
           <div className="brain-examples">
             {EXAMPLES.map((example) => (

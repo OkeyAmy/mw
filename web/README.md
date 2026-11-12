@@ -43,18 +43,21 @@ be cut short.
 | element | binds to |
 |---|---|
 | column x | layer index 0 … L−1 (real order, straight from `/api/info.layers`) |
-| nodes per column | `layers[l].neurons` (top-3 in the stream; up to 12 drawn if present) |
+| nodes per column | `layers[l].neurons` (top-3 in the stream; up to 12 drawn if present), **keyed by neuron index** — not by rank |
 | node y | the neuron's measured activation value, log-scaled against the token peak |
 | node radius | `layers[l].norm` scaled within the current token |
 | fill / edge alpha | activation relative to the token's peak (mint, no glow) |
 | edges | layer *l* → *l+1* adjacency, plus faint *l* → *l+2*; structural, not weights |
 | particles | one per layer transition per generated token; duration derived from that token's measured `ms` |
+| transitions | present neurons move over 280 ms; dropped ones fade in place; new ones fade in; >50 % rise flashes, a fall dims |
+| ghosts | the last 3–4 token trajectories at ~15 % so history is visible |
 | HUD | tokens · active neurons (≥25 % of peak) · selected layer · tok/s |
 | caption | `measured activations · correlation, not meaning` → `STEERING ACTIVE · causal` iff the frame says `steered: true` |
 
 A layer with no payload is drawn as a hollow circle. Hover gives numbers
 (layer · norm · neuron id · value). Clicking anywhere in a column opens that
-layer in the right panel.
+layer in the right panel. The footer states what is truncated:
+`top-k of 8960 per layer (wire sends top-3)`.
 
 **Geometry toggle** (`geometry`) uses the real `layers[l].xy` shared-PCA
 coordinates when the server sends them; layers stay in real order and points

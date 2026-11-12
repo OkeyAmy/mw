@@ -29,6 +29,9 @@ app = [
   "httpx>=0.27",
 ]
 
+[project.scripts]
+mw-certify = "mw.certify:main"
+
 [tool.setuptools.packages.find]
 where = ["code"]
 

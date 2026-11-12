@@ -727,7 +727,8 @@ input[type="range"]::-moz-range-thumb {
   color: var(--ink-faint);
   pointer-events: none;
   text-align: right;
-  max-width: 46%;
+  max-width: 54%;
+  line-height: 1.4;
 }
 
 .graph-hud {
