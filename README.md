@@ -1,113 +1,221 @@
 # mw
 
-**A local-first microscope for open-weight language models.** Trace what a model
-does inside, prove which activations are causal, and intervene — with controls
-that are allowed to fail.
+A local-first microscope for open-weight language models: read the internal state
+behind every generated token, intervene mid-generation, and **certify** what
+changed when a model is quantised or fine-tuned.
 
-Every claim in this repository is paired with a test that can falsify it. Where a
-test failed, the failure is recorded rather than deleted.
+Everything here is measured. Where a claim failed, the failure is in this file.
 
 ```
 prompt ──► transformer ──► next token
              ▲  ▲  ▲
-             │  │  └─ steering: add coef·v at layer L, live, per token
-             │  └──── logit lens: what does layer L want to say?
-             └─────── trace: every residual, every attention pattern
+             │  │  └─ steer: add coef·v to a layer, or clamp a neuron
+             │  └──── lens: what does layer L want to say next?
+             └─────── trace: residual magnitude, PCA position, top neurons
 ```
 
-## What it does
+---
 
-- **Trace** every layer's residual stream, per token.
-- **Logit lens** — project any layer through the final norm + unembedding.
-- **Causal patching** — prove an activation matters, with layer/random controls.
-- **Steering** — add a direction to the residual stream mid-generation.
-- **Capability report** — states plainly what a given model supports.
+## 1. Architecture
 
-## Known boundaries — and what is still open
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  web/  Next.js 16 (port 3000)                                        │
+│  · chat rail (300px, collapsible)                                    │
+│  · brain viewport: 40 layer columns + per-token trajectories         │
+│  · right panel: Trace | Neurons | Steer                              │
+└───────────────▲──────────────────────────────────────────────────────┘
+                │ WebSocket /ws  +  REST /api/*
+┌───────────────┴──────────────────────────────────────────────────────┐
+│  app/server.py  FastAPI (port 8000)                                  │
+│  · one model, one generation lock, 180s watchdog                     │
+│  · per-connection steering state                                     │
+│  · mid-generation context injection (KV-cache extension)             │
+└───────────────▲──────────────────────────────────────────────────────┘
+                │ ModelAdapter API
+┌───────────────┴──────────────────────────────────────────────────────┐
+│  code/mw/  the instrument (no web dependencies)                       │
+│                                                                      │
+│  registry.py   per-architecture descriptors (tensor map, scaling)    │
+│  convert.py    GGUF → HF safetensors, refuses what it cannot do      │
+│  guard.py      memory safety; refuses loads that would freeze        │
+│  adapter.py    load, hooks, trace, lens, steer, neurons, stream      │
+│  certify.py    quantisation / fine-tune decision-flip certificate    │
+└──────────────────────────────────────────────────────────────────────┘
+```
 
-These are stated as **measured facts** or **UNVERIFIED**, never as settled
-negatives. The live list is tracked locally, not published.
+### Why it is split this way
 
-**Measured:**
-- APIs do not return hidden states. Activation-level tracing requires weights.
-- Superposition and polysemanticity are real; "neuron 4021 = recursion" is not a
-  thing in the weights.
+`code/mw` never imports the web app. It is the only place that touches weights,
+so it can be tested, audited and reused from a script. `app/` is a thin protocol
+layer. `web/` is a renderer. If the UI is wrong, the instrument is still correct;
+if the instrument is wrong, no UI can save it.
 
-**Open — do not treat as settled:**
-- **Can internals be recovered from an API?** Partly, yes — Carlini et al. 2024
-  (arXiv:2403.06634) recovered a production model's embedding projection layer
-  from logits alone. How far this generalises is unknown; agent F2 is on it and
-  has not reported.
-- **Does a distilled surrogate transfer mechanism?** F1 says behaviourally yes,
-  mechanistically mostly no — but that is one setting and its decisive test is
-  unrun.
-- **Does steering work?** Our current vector fails our own specificity test on
-  bf16 (C4). That is a fact about *this vector* and *this test*, not a proof that
-  steering is impossible. The criterion changed twice during development and is
-  under audit (G1, pending).
+### Module by module
 
-> Until G1 returns, treat C4's failure as **provisional**, and treat every
-> "cannot" above as **UNVERIFIED**.
+| file | what it does | what it refuses |
+|---|---|---|
+| `registry.py` | one `ArchSpec` per architecture: GGUF tensor-name map, HF class, scaling factors | unknown arch, fused QKV (Phi-3), VL models |
+| `convert.py` | GGUF → HF safetensors; carries `embedding/residual/attention/logit` scales into `config.json` | missing scaling metadata (would be 8× wrong), non-finite weights, fp16 overflow, tie mismatch |
+| `guard.py` | reads `MemAvailable` via psutil, estimates model footprint from the safetensors header | loads that would exceed RAM; BF16→FP16 (overflows to NaN) |
+| `adapter.py` | `ModelAdapter`: hooks on every layer, `trace()`, `logit_lens()`, `set_steer()`, `set_neuron_steer()`, `stream()` | out-of-range layers, missing output embedding, missing `logits_scaling` on Granite |
+| `certify.py` | reference vs candidate decision comparison with margins, KL, Wilson CI, null control | stale cache (fingerprint mismatch), tokenizer mismatch |
 
-## Supported architectures
+---
 
-| architecture | GGUF → HF | trace/lens | notes |
-|---|---|---|---|
-| Qwen2 / Qwen2.5 | ✅ | ✅ verified `0.000e+00` | q/k/v biases handled |
-| Llama / Mistral | ✅ | ✅ | Mistral uses the `llama` GGUF arch string |
-| Granite 3.x | ✅ | ✅ verified `9.5e-06` | **four scaling factors**; ignoring them is 1.4e+02 wrong |
-| Gemma 1/2/3 | partial | ✅ | per-version check required |
-| Phi-3 | ❌ refused | — | fused QKV tensors; conversion not implemented |
+## 2. Data flow, one token at a time
 
-Adding a model is a **data change, not a code change**: add an `ArchSpec` to
-`code/mw/registry.py` and a slow test. Unknown architectures are **refused**,
-never silently mapped to a default.
+1. The user sends a message. The client sends the **whole conversation**
+   (`messages[]`), not a single prompt — otherwise every turn is a cold start.
+2. The server renders it through the model's chat template and prefills
+   (~9 s for 60 tokens at 2B on this CPU).
+3. For each generated token the server captures, per layer:
+   - `norm` — magnitude of that layer's residual output at the last position
+   - `xy` — its coordinate in a **shared 2-D PCA** of the standardised residual
+     trajectory (fit over a rolling buffer of 32 tokens, re-fit every 8)
+   - `lens` — top-3 next-token predictions from that layer (logit lens)
+   - `neurons` — top-3 MLP intermediate indices and activation values
+4. The payload also carries provenance: `steered`, `coef`, `steer_layer`,
+   `neuron_steer`, and `pca.var_explained`.
+5. The UI draws one trajectory per token. Tokens are keyed by `layer:neuron`,
+   so a neuron that persists moves, one that drops fades out, a new one fades in.
 
-## Live app
+Payload per token is ~4 KB. Full schema: `app/PROTOCOL.md`.
 
-Two processes, one contract (`app/PROTOCOL.md`):
+### What each field means
+
+| field | meaning | how to read it |
+|---|---|---|
+| `norm` | residual magnitude at that layer | bigger = that layer is "loud" at this token |
+| `xy` | position in shared PCA space | shape of the trajectory, **not** semantics |
+| `pca.var_explained` | how much of the trajectory the 2 PCs carry | below ~0.4 the 2-D view is a poor summary |
+| `lens` | what layer L would predict if it were the last layer | early layers are approximations |
+| `neurons` | top-3 of 8960 MLP units by activation | the wire sends 3; the panels use up to 32 |
+| `steered` | whether an intervention was active for this token | the only field that makes a token causal |
+| `coef` | coefficient in **units of one residual norm** | calibrated per layer; 0 is a true no-op |
+
+---
+
+## 3. The UI, control by control
+
+### Left rail (chat)
+
+- **Composer** — Enter sends, Shift+Enter newline, Esc cancels.
+- **Example chips** — click runs the prompt immediately.
+- **Inject** — appears while streaming. Sends `inject`; the server closes the
+  current assistant turn, appends **one user turn** (18 tokens, template diff),
+  and continues. *What might happen:* the 2B model may follow it, may finish the
+  old sentence first, or may ignore it. It always appears as a chip at the step
+  it landed, and the next token's trace changes.
+- **Cancel** — stops after the current token. A 180 s watchdog also cancels.
+- **Steering readout** — `steer L8 · coef 0.0 (off)`: the layer and coefficient
+  that will apply to the next token.
+
+### Brain viewport (centre)
+
+- **40 layer columns**, left to right = layer order. The footer says
+  `top-k of 8960 per layer` because we only capture the top few.
+- **Nodes** — one per (layer, neuron). Radius from `norm`; brightness from the
+  neuron's value. Click a column to open that layer.
+- **Trajectory** — the path of one token through the layers. Previous 3–4 tokens
+  remain as 15% ghosts.
+- **HUD** — tokens, active neurons, current layer, tok/s.
+- **Geometry** — switches between layer-column view and the PCA `xy` view.
+  *What might happen:* the PCA basis re-fits every 8 tokens, so older ribbons are
+  dropped and labelled `basis vN`. That is deliberate; mixing bases would lie.
+- **Export** — downloads the session trace as JSON.
+
+### Right panel (Trace | Neurons | Steer)
+
+**Trace** — the selected token's frame: step, token, `steered`, `coef`,
+`steer_layer`, layer count. If `steered` is true, the badge reads `causal`;
+otherwise `correlation, not meaning`.
+
+**Neurons** — for the selected layer:
+- top-32 MLP units with indices and activation values
+- lens top-3 for that layer
+- *what it means:* a neuron is an index in the MLP intermediate
+  (`down_proj` input). It is **not** a named concept; the same unit fires for
+  unrelated things.
+
+**Steer** — two independent interventions:
+
+1. **Global steering** (layer + coefficient)
+   - `coef = 1` is one residual norm at that layer; the slider is clamped.
+   - Applies `h += coef · v` where `v` is a diff-in-means direction built from
+     contrast pairs (comment-style vs code-style prompts).
+   - *What might happen:* output changes character; large coefficients produce
+     repetition, empty lines, or derailment. `coef = 0` is bit-identical to off.
+   - *Honest status:* it changes output, but C4 shows the direction does not
+     carry the intended semantics at a usable scale (§5).
+
+2. **Steer neuron** (index + value → `apply`, or `ablate`)
+   - Writes an absolute value into that MLP unit at the last position, for
+     subsequent tokens.
+   - Natural activations here are ~4–6; `50` is roughly 10×.
+   - `ablate` sets it to `0` — a targeted deletion, not a semantic control.
+   - *What might happen:* a single unit rarely flips a token by itself; extreme
+     values can destabilise the whole layer. Per-connection: another client is
+     never affected.
+
+---
+
+## 4. Run it
 
 ```bash
-make backend    # FastAPI + model on :8000
-make frontend   # Next.js on :3000
+# backend (one model, CPU)
+PYTHONPATH=code .venv/bin/python app/server.py --model .hf/granite-hf --dtype float32
+# frontend
+cd web && npm install && npm run build && npm start
 ```
 
-Open http://localhost:3000. The brain is the product; chat is an input box.
+Open **http://localhost:3000**. `ui/index.html` is a redirect stub, not the app.
 
-**Activation steering vs context injection — they are different:**
+Other models: `--model .hf/bf16-hf` (Qwen2.5-Coder-1.5B), or convert a GGUF:
 
-| | changes | model sees |
-|---|---|---|
-| activation steering | residual stream / neuron values | same tokens |
-| context injection | the token sequence | new text, from that point |
+```bash
+PYTHONPATH=code python -m mw.convert --gguf path/to.gguf --out .hf/model \
+  --hf-repo ibm-granite/granite-3.3-2b-instruct
+```
 
-Measured on Granite 3.3 2B (2026-11-11): appending **raw text** mid-stream has
-**no effect** (`' Paris.'` with and without an inserted sentence). Formatting the
-insertion as a **user turn** through the model's chat template **does** change the
-continuation. The server therefore renders injections as turns; use
-`--no-chat-template` to disable.
+Supported: Qwen2/2.5, Llama/Mistral, Granite 3.x, Gemma (partial). Unknown
+architectures are **refused**, never guessed.
 
-The first implementation appended a **whole rendered template**, which re-inserted
-the system preamble and reopened the assistant turn without closing the previous
-one — 67 tokens per injection. It now appends only the template diff (18 tokens):
-`<|end_of_text|>` + user turn + assistant prompt. Live check:
-injecting "What is the capital of Japan?" mid-stream yields
-`The capital of Japan is Tokyo, Japan.`
+---
 
-**Steering units are calibrated.** `coef = 1` means *one residual norm* at that
-layer. The original vectors were normalised on raw text but applied to
-chat-formatted prompts, so a unit was 2.6 residual norms at L8 and 59 at L9 —
-most slider positions were 5–60× too strong. `residual_scale()` measures
-`||h_last||` per layer on chat-rendered text and `calibrate_vectors()` rescales
-direction-preserving. Live: the same prompt at L8 gives
-`coef 0 → "It seems like you"`, `+2 → "I'm sorry for"`, `−2 → "\n\nI'm"`.
+## 5. What is actually proven (and what is not)
 
-Injection also had a cache bug worth remembering: after forwarding the injected
-tokens, re-feeding the last one duplicates a token already in the KV cache and
-corrupts every later step. The loop now keeps the injection forward's logits
-instead of re-feeding.
+| link | result |
+|---|---|
+| C1 trace | PASS — matches HF hidden states, max diff `0.000e+00` |
+| C2 logit lens | PASS — `0.000e+00` at the final layer |
+| C3 causal patching | PASS — L22–27 recover ≈1.0, L0–20 ≈0 |
+| C4 steering specificity | **FAIL** — calibrated, 20 controls |
+| C5 mid-generation | PASS — divergence begins after the switch |
+| C6 force vs steer | PASS for forcing; semantic arm provisional |
+| C7 neuron atlas | PASS at threshold 1e-6 (coverage, not meaning) |
+| C8 sanity gate | PASS — 10/10 |
 
-## Certificate: what did quantisation change?
+**C4, calibrated run** (L8, coef +1 = one residual norm, 20 random controls):
+
+```
+T1 target      real -0.38    random p95 +1.12    FAIL
+T2 collateral  real  2.87    random median 2.28  FAIL
+T4 sign        real  0.10    random p95 1.00     FAIL
+```
+
+At a realistic perturbation the vector moves the target slightly the wrong way,
+and only 1 of 10 held-out prompts responds consistently. At 130× it produced
++4.4 — that was saturation, not steering. **The slider changes output; it is a
+perturbation knob, not semantic control.**
+
+Also proven the hard way: quantisation hid a failure (Q4 passed where bf16 did
+not), a BF16→FP16 cast silently produces NaN, and a half-installed `next`
+package can look present while being unusable.
+
+---
+
+## 6. Certificate
 
 ```bash
 PYTHONPATH=code python -m mw.certify \
@@ -115,179 +223,56 @@ PYTHONPATH=code python -m mw.certify \
   --builtin 41 --null-control --out proof/cert_qwen_q4
 ```
 
-It compares **next-token decisions**, not benchmark averages, and prints the
-null control (same model, other dtype) so the result has a floor.
+Compares **next-token decisions**, not benchmark averages, and prints a null
+control (same model, other dtype) so the result has a floor.
 
-First run, Qwen2.5-Coder-1.5B bf16 vs Q4_K_M, 41 unique prompts:
+First run, 41 unique prompts:
 
 | metric | value |
 |---|---|
-| decisions flipped | **2 / 41 (4.9%)** |
+| decisions flipped | 2/41 (4.9%) |
 | 95% CI | [1.4%, 16.1%] |
-| confident flips (ref margin > 1 nat) | **0** |
-| mean KL / max KL | 0.042 / 0.218 |
-| null control (fp32 vs bf16) | **0.0%** [0%, 8.6%] |
+| confident flips | 0 |
+| mean / max KL | 0.042 / 0.218 |
+| null control (fp32 vs bf16) | 0.0% [0%, 8.6%] |
 
-The two flips:
+The two flips: `Two plus two equals` → **` three`**, and `The author of Hamlet
+was` → ` born`. Both were near-ties (< 0.25 nat).
 
-| prompt | bf16 | Q4_K_M | ref margin |
-|---|---|---|---|
-| `Two plus two equals` | ` four` | ` three` | 0.19 |
-| `The author of Hamlet was` | ` a` | ` born` | 0.21 |
+**It does not certify at 5%**: with 41 unique prompts the upper bound is 16.1%,
+and the null control's bound (8.6%) is wider than the observed rate, so the
+flips cannot be attributed to quantisation rather than precision noise. The tool
+says so in the report instead of showing a pass badge.
 
-**What this does not say.** It is *not certifiable* at a 5% gate: with 41 unique
-prompts the 95% upper bound is 16.1%. And because the null control's upper bound
-(8.6%) is wider than the observed flip rate (4.9%), we **cannot claim
-quantisation caused those flips** rather than precision noise. Both flipped on
-near-ties (margin < 0.25 nat).
+Next size: 96 items is the first that can honestly certify a 5% gate (3.8%
+upper bound on zero flips); 384 narrows it to ~1%.
 
-The null control here is fp32-vs-bf16 because this checkpoint is bf16 and a
-bf16→fp16 cast overflows; the fp16 storage floor C1 measured (3.4–6.7%) cannot
-be reproduced on this model. That limitation is part of the certificate.
+---
 
-## Memory safety (read this)
+## 7. Limits, stated plainly
 
-Loading a model can freeze a laptop if it does not fit. This package refuses
-unsafe loads instead of hanging.
+- **No neuron-level concepts.** Superposition and polysemanticity are real. A
+  neuron is an index, not a word.
+- **The 3-D view is a projection.** `z` is layer order (real); `x/y` are PCA.
+  Variance explained is printed because it matters.
+- **API-only models are out of scope.** No hidden states, so no trace. Whether
+  internals can be recovered from logits is unsettled; partial recovery is
+  published, full mechanism is not.
+- **Steering is not solved.** See C4 above.
+- **Long context is not tested.** 32k is configured; nothing here validates it.
 
-- `load()` calls `mw.guard.require(path)` first and raises `MemoryError` with
-  advice rather than starting a doomed allocation.
-- **zram swap** (Linux) is detected as a risk: it is RAM-backed, so memory
-  pressure spirals instead of degrading. It is never *required*; macOS and
-  Windows use different mechanisms and the guard handles them via `psutil`.
-- **Never cast a BF16 checkpoint to FP16.** BF16 shares fp32's exponent range;
-  FP16 tops out at 65504, so the cast silently produces `NaN` logits. The
-  adapter refuses this and tells you to use `float32` or `bfloat16`.
-- `low_cpu_mem_usage=True` is always set, to avoid duplicating the state dict.
+---
 
-Recommended:
-
-```python
-a = ModelAdapter("Qwen/Qwen2.5-Coder-1.5B").load(dtype=torch.float32)  # BF16 source
-a = ModelAdapter(".hf/granite-hf").load(dtype=torch.float16)           # FP16 artefact
-```
-
-## Install
-
-```bash
-uv venv --python 3.12 .venv
-.venv/bin/python -m pip install -e ".[dev]"
-```
-
-CPU-only is the primary target. A 1.5B model runs at ~2–3 tok/s single-stream
-fp32, ~49 tok/s batched on 4 physical cores.
-
-## Quickstart
-
-```python
-from mw.adapter import ModelAdapter
-
-a = ModelAdapter("Qwen/Qwen2.5-Coder-1.5B").load()
-print(a.capabilities().report())
-
-trace = a.trace("def add(a, b):\n")
-print(trace["next_topk"][:3])
-
-v = a.diff_in_means([("# add two numbers\n", "def add(a,b):\n")], layer=8)
-a.set_steer(8, v, coef=2.0)
-print("".join(t["token_str"] for t in a.generate("def add(a, b):\n", max_new_tokens=16)))
-```
-
-Convert a GGUF you already have (no re-download):
-
-```bash
-PYTHONPATH=code python -m mw.convert \
-  --gguf ~/.ollama/models/blobs/sha256-... \
-  --out .hf/granite-hf \
-  --hf-repo ibm-granite/granite-3.3-2b-instruct
-```
-
-## The validation regime
-
-This is the part that matters more than the features.
-
-| file | what it enforces |
-|---|---|
-| `VALIDATION.md` | hypothesis → test → result → verdict. Citations must be fetched, numbers recomputed. |
-| `PROOF_CHAIN.md` | eight links (C1–C8), each with a pass criterion and a negative control. |
-| `tests/` | fast tests need no model (CI); slow tests load real weights (release gate). |
-
-Rules learned the hard way, now enforced:
-
-- **Monotonicity is not specificity.** Any `α·v` moves logits roughly linearly,
-  so a monotone dose-response is produced by random vectors too. (`VALIDATION.md` L1)
-- **Never validate steering on a quantised artefact.** The same vector passed on
-  Q4_K_M and failed on bf16. (L2)
-- **Replacement is not addition.** A "random replacement" control should destroy
-  the signal; asserting it does nothing is a category error. (L3)
-
-```bash
-make fast    # no model, no network — what CI runs
-make slow    # real weights — what a release requires
-make prove   # the full C1–C8 chain
-```
-
-## Status (honest)
-
-| link | result |
-|---|---|
-| C1 trace | PASS — `0.000e+00` |
-| C2 lens identity | PASS — `0.000e+00` |
-| C3 causal patching | PASS — L22–27 ≈ 1.0, L0–20 ≈ 0 |
-| C4 steering specificity | **FAIL** — re-run with the corrected estimator, T1/T4 still fail |
-| C5 mid-generation | PASS — divergence begins after the switch |
-| C6 force vs steer | **PROVISIONAL** — force 1.00 works; the semantic arm used the broken vector |
-| C7 neuron atlas | PASS at threshold 1e-6 (coverage, not meaning) |
-| C8 sanity gate | PASS — 10/10 |
-
-The instrument is trustworthy. The *control* claim is **not yet established** —
-which is different from "disproved".
-
-**C4, re-run with the corrected estimator (2026-11-11).** The first run used a
-last-token vector that was numerically identical to an embedding difference
-(cosine 1.00000) — it was steering "ends with this token", not comment mode.
-The estimator is now position-averaged over pairs with an identical suffix, and
-the artifact is gone:
+## 8. Layout
 
 ```
-L0  norm=  0.3   max cos to any token embedding = 0.4669
-L8  norm=335.1   max cos = 0.0925
-L16 norm=338.5   max cos = 0.0920
+code/mw/         instrument (registry, convert, guard, adapter, certify)
+code/            proof chain, experiments, converters
+app/             FastAPI server + PROTOCOL.md + BRAIN_3D_SPEC + DESIGN
+web/             Next.js UI
+tests/           116 tests (fast: no model; slow: real weights)
+proof/           artifacts (certificates, proof chain, sanity)
 ```
-
-**The scale mattered more than the direction.** The first re-run used raw
-vectors of norm ~335 against a residual norm of ~5 — `coef=2` was a ~130×
-perturbation. S1 found the unit bug: vectors were normalised on raw text but
-applied to chat-formatted prompts, so one unit was 2.6 residual norms at L8 and
-**59 at L9**. After `residual_scale()`/`calibrate_vectors()`, `coef=1` means one
-residual norm, which is the regime the UI actually operates in.
-
-C4 re-run at that calibrated scale (L8, coef +1, 20 random controls):
-
-| test | result | numbers |
-|---|---|---|
-| T1 selectivity | **FAIL** | real target **−0.38** vs random p95 **+1.12** |
-| T2 collateral | **FAIL** | real control 2.87 vs random median 2.28 |
-| T4 held-out sign | **FAIL** | real **0.10** — only 1 of 10 prompts moved the right way |
-
-At a realistic perturbation the vector does not just fail to beat random: it
-moves the target **slightly the wrong way** and is almost entirely inconsistent
-across held-out prompts. At 130× it produced +4.4 — that was **saturation**, not
-semantics. Every large perturbation moves logits; that is not steering.
-
-**Honest status: the steering slider changes output, but it is a perturbation
-knob, not semantic control.** Any coefficient changes the text; the diff-in-means
-direction does not carry the intended semantics at a usable scale. Measurement
-and forcing (C6) are unaffected.
-
-## Contributing
-
-The most useful contribution is a model we cannot load. Open an issue with the
-GGUF arch string and a tensor listing; we add an `ArchSpec` and a slow test.
-
-Every PR must keep `make fast` green and must not weaken a control to make a
-test pass. If a test needs its criterion changed, the change goes in
-`PROOF_CHAIN.md` with the reason.
 
 ## License
 
