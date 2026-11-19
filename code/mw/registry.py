@@ -31,6 +31,10 @@ class ArchSpec:
     # If True, conversion MUST find every config_from_gguf key in the GGUF.
     # Falling back to 1.0 is the exact failure this field exists to prevent.
     requires_config_from_gguf: bool = False
+    # llama.cpp stores attn_q / attn_k with interleaved even/odd RoPE pairs
+    # (n_head, head_dim//2, 2, d) for ROPE_TYPE_NORM models, while HF's
+    # rotate_half expects split halves (n_head, 2, head_dim//2, d).
+    rope_interleaved_gguf: bool = False
     fused: bool = False
     notes: str = ""
 
@@ -59,7 +63,8 @@ SPECS: dict[str, ArchSpec] = {
     "llama": ArchSpec(
         gguf_arch="llama", hf_arch="LlamaForCausalLM",
         tensor_map=dict(_COMMON),
-        notes="Llama family. Usually no attention biases; absent keys are skipped.",
+        rope_interleaved_gguf=True,
+        notes="Llama family. GGUF permutes Q/K rotary rows; un-permuted on convert.",
     ),
     # NOTE: Mistral GGUFs report arch "llama", so a separate registry entry can
     # never be selected by `resolve()`. The HF class is decided by the config
@@ -77,10 +82,10 @@ SPECS: dict[str, ArchSpec] = {
         # each alone moves logits 9.6-10.2; logits_scaling 122). A missing key
         # must abort the conversion, not silently reproduce the 8x bug.
         requires_config_from_gguf=True,
+        rope_interleaved_gguf=True,
         notes=(
-            "IBM Granite. Carries embedding/residual/attention/logit scaling. "
-            "transformers defaults all four to 1.0, so a naive conversion loads "
-            "fine and is numerically wrong. Conversion REFUSES if any is absent."
+            "IBM Granite. Carries embedding/residual/attention/logit scaling and "
+            "GGUF-interleaved Q/K rotary rows. Conversion REFUSES if scaling is absent."
         ),
     ),
     "gemma": ArchSpec(

@@ -529,6 +529,11 @@ def test_edit_prompt_restarts_generation(live):
     assert msgs[-1]["type"] == "done"
     assert msgs[-1]["injected_at"] is None
     assert msgs[-1]["timed_out"] is False
+    # The session id is reused by the restart, so the stored metadata must
+    # follow the transcript that actually produced the later tokens.
+    exported = httpx.get(f"{live}/api/export/{msgs[-1]['session']}", timeout=10).json()
+    assert exported["prompt"] == "return a + b"
+    assert exported["messages"] == [{"role": "user", "content": "return a + b"}]
 
 
 def test_cancel_stops_after_current_token(live):

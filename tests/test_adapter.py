@@ -14,11 +14,12 @@ GRANITE = ROOT / ".hf" / "granite-hf"
 QWEN_OK = (QWEN / "model.safetensors").exists()
 GRANITE_OK = (GRANITE / "model.safetensors").exists()
 
-# Golden values recorded from the converted artefact in float16 (2026-11-11).
-# These catch a wrong name map or transposed weights, which self-consistency
+# Golden values recorded from the converted artefact in float16 (with GGUF Q/K
+# RoPE rows unpermuted to HF split-half layout). These catch a wrong name map,
+# missing RoPE unpermutation, or transposed weights, which self-consistency
 # cannot (G1 D5).
 GOLDEN_PROMPT = "def add(a, b):\n"
-GOLDEN_ARGMAX = 589          # token 'def'
+GOLDEN_ARGMAX = 601          # token 'return'
 GOLDEN_MAXABS_LO, GOLDEN_MAXABS_HI = 19.0, 21.5
 
 

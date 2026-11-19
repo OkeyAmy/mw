@@ -43,6 +43,19 @@ def map_tensor(name: str, spec) -> str | None:
     return f"model.layers.{idx}.{hf}" if hf else None
 
 
+def unpermute_qk(w: np.ndarray, n_heads: int) -> np.ndarray:
+    """Invert llama.cpp's GGUF RoPE permutation (interleaved pairs -> HF split-half)."""
+    if n_heads <= 0 or w.shape[0] % (2 * n_heads) != 0:
+        raise ValueError(f"cannot unpermute Q/K of shape {w.shape} with n_heads={n_heads}")
+    head_dim = w.shape[0] // n_heads
+    rest = w.shape[1:]
+    return np.ascontiguousarray(
+        w.reshape(n_heads, head_dim // 2, 2, *rest)
+         .swapaxes(1, 2)
+         .reshape(w.shape)
+    )
+
+
 def fetch_small_files(repo: str, out: Path) -> None:
     """Fetch config/tokenizer files. Failures are reported, not swallowed (G1 D19)."""
     from huggingface_hub import hf_hub_download
@@ -101,6 +114,12 @@ def main() -> int:
 
     print(f"arch={gguf_arch} -> {spec.hf_arch} ({len(r.tensors)} tensors)", file=sys.stderr)
 
+    n_heads_q = int(meta.get(f"{gguf_arch}.attention.head_count", 0) or 0)
+    n_heads_kv = int(meta.get(f"{gguf_arch}.attention.head_count_kv", n_heads_q) or n_heads_q)
+    if spec.rope_interleaved_gguf and n_heads_q <= 0:
+        sys.exit(f"REFUSING: {gguf_arch} requires {gguf_arch}.attention.head_count "
+                 f"in GGUF metadata to unpermute Q/K RoPE rows.")
+
     tensors: dict[str, np.ndarray] = {}
     unknown = []
     nonfinite = []
@@ -110,6 +129,11 @@ def main() -> int:
             unknown.append(t.name); continue
         d = quants.dequantize(t.data, t.tensor_type)
         # quants.dequantize returns HF-compatible [out, in]; do NOT transpose.
+        if spec.rope_interleaved_gguf:
+            if ".attn_q." in t.name:
+                d = unpermute_qk(d, n_heads_q)
+            elif ".attn_k." in t.name:
+                d = unpermute_qk(d, n_heads_kv)
         if not np.isfinite(d).all():
             nonfinite.append(t.name)
         if args.dtype == "float16" and d.ndim == 2:

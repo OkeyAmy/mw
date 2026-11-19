@@ -113,7 +113,7 @@ export function LayerDetail({
 
   const neurons = useMemo(() => {
     const list = layerData?.neurons ?? [];
-    return [...list].sort((a, b) => b[1] - a[1]).slice(0, 32);
+    return [...list].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 32);
   }, [layerData]);
   const maxNeuron = neurons.reduce((m, [, v]) => Math.max(m, Math.abs(v)), 0) || 1;
 

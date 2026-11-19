@@ -473,6 +473,21 @@ class SessionStore:
                     "layers": detail,
                 }
 
+    def rebase(self, sid: str, *, prompt: str, messages: list[dict]) -> None:
+        """Re-point a live session at the transcript it is actually generating.
+
+        `edit_prompt` swaps the transcript mid-stream but reuses the session id,
+        so without this the export keeps naming the prompt that started the
+        session — a provenance bug: the trace would describe tokens it did not
+        produce.
+        """
+        with self._lock:
+            rec = self._d.get(sid)
+            if rec is None:
+                return
+            rec["prompt"] = prompt
+            rec["messages"] = list(messages)
+
     def finish(self, sid: str, reason: str, n_tokens: int) -> None:
         with self._lock:
             rec = self._d.get(sid)
@@ -1044,6 +1059,9 @@ def _worker(gen: Generation, send) -> None:
             if gen.control.restart is not None:
                 gen.messages = gen.control.restart
                 gen.control.restart = None
+                # The session id is reused, so the stored metadata must follow
+                # the transcript that is now being generated.
+                SESSIONS.rebase(sid, prompt=gen.prompt, messages=gen.messages)
                 send({"type": "restarted", "session": sid, "prompt": gen.prompt})
                 continue
             reason = "eos" if gen.control.eos else "max_new"

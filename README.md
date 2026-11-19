@@ -146,17 +146,108 @@ otherwise `correlation, not meaning`.
      contrast pairs (comment-style vs code-style prompts).
    - *What might happen:* output changes character; large coefficients produce
      repetition, empty lines, or derailment. `coef = 0` is bit-identical to off.
-   - *Honest status:* it changes output, but C4 shows the direction does not
-     carry the intended semantics at a usable scale (§5).
+   - *Honest status (updated 2026-11-19):* the estimator that built `v` had two
+     defects — position-0 attention-sink contamination, and the comment placed
+     above the function header where the held-out prompts never test it. With
+     both fixed the direction moves the intended target +2.4…+3.2 nats at
+     coef 1 with 10/10 held-out sign consistency (screened against 5 matched
+     random controls; the full 20-control rerun is pending). §5 records both
+     runs.
 
 2. **Steer neuron** (index + value → `apply`, or `ablate`)
    - Writes an absolute value into that MLP unit at the last position, for
      subsequent tokens.
-   - Natural activations here are ~4–6; `50` is roughly 10×.
+   - Natural activations here are signed (SwiGLU is signed): the panel ranks
+     workers by strength and shows the sign, e.g. `n1007: -30.1` at L38.
    - `ablate` sets it to `0` — a targeted deletion, not a semantic control.
-   - *What might happen:* a single unit rarely flips a token by itself; extreme
-     values can destabilise the whole layer. Per-connection: another client is
-     never affected.
+   - *What might happen:* at mid layers a single unit is usually a no-op
+     (20/20 ablations at L14/L30 changed nothing), but a late-layer unit with a
+     large signed write can flip the next word when reversed (L38 `n1007`
+     −30 → +60 changed the sentence opening). Extreme values saturate the
+     layer. Per-connection: another client is never affected.
+
+---
+
+### Every parameter, in plain words
+
+No ML background needed for this part. The picture: the model is a **factory
+with 40 workstations in a row**. A word enters at station 1 and is passed
+along; at every station, **8,192 small workers** each add one bit to the
+product; what comes out of station 40 is the next word. A **layer** is a
+workstation. A **neuron** is one worker. Everything below is a knob on that
+factory.
+
+#### Chat rail
+
+| control | plain meaning | limits |
+|---|---|---|
+| prompt / messages | the question. The whole conversation is sent every time, so the model remembers earlier turns. | ≤ 4000 chars per message, ≤ 16 000 per conversation |
+| max | how many words it may write before stopping. It also stops on its own when the answer is finished. | 1–256 (the composer starts at 48) |
+| Send / Esc | start writing / stop. Stop takes effect after the word currently being written. | — |
+| inject | type a new question **while it is still answering**. The unfinished sentence is closed, your text becomes a new user turn, and the model answers that instead. Works best as a concrete question — "What is the capital of Japan?" → it answers Japan. Vague instructions ("answer in French") get ignored by a 2B model; that is measured, not a bug. | ≤ 2000 chars |
+| edit_prompt | throw the half-written answer away and restart on a new question. Cleaner than inject when you do not care about the interrupted sentence. | ≤ 4000 chars |
+
+Two people can use the model at once: every knob is per connection, so your
+steering never leaks into anyone else's answer (tested).
+
+#### Steer (the layer slider)
+
+One slider, one number. It leans a whole workstation in one direction — every
+worker at that station at once.
+
+| part | plain meaning |
+|---|---|
+| layer | which workstation (0–39). Early: the lean flows through 30 more stations and gets absorbed — harder to predict. Late: almost straight to the next word. |
+| coef | how hard the lean is. **0 is exactly off** — the model cannot tell it apart from untouched (tested bit for bit). **1.0 is one full unit** of the signal at that station, and on the fixed model that is already enough to change the opening word. |
+| sign | one end pushes toward "explain in words", the other toward "just write the code". On `def fib(n):` at layer 14: coef −1 makes it write `def fib(n):` and `if n > 1:`; coef +1 keeps it talking about the function. |
+
+The UI slider spans −4…+4 (the protocol accepts ±20). Measured honestly: below
+about ±1 at mid layers nothing visibly moved, and large values produce newlines
+and loops — damage, not steering. The number means the same thing on every
+layer by construction; the *effect* still differs by layer.
+
+#### Steer a neuron
+
+| part | plain meaning |
+|---|---|
+| neuron | one worker out of 8,192 at that station. An index — `n3766` is slot 3766, not a concept. |
+| value | an **absolute setting** written into that worker, like a dimmer with a sign — not a multiplier. |
+
+| you type | what happens |
+|---|---|
+| its natural value | the worker keeps doing its job — no change |
+| 0 | send it on break |
+| the opposite sign | make it push backwards — usually the only change you can see |
+| bigger, same sign | usually nothing: it was already pushing that way |
+
+The panel shows the worker's natural setting next to the input (e.g.
+`n3766: 43.79`), which tells you the useful scale. The wire accepts
+|value| ≤ 10 000; the panel input clamps to ±1000. Two measured facts: at mid
+layers (14, 30) ablating the ten strongest workers changed nothing at all, while
+at a late layer (38) one strongly negative worker flipped the sentence opening
+when reversed. `clear` releases one station or all of them; afterwards the
+output matches the untouched model again (tested).
+
+#### The numbers in the right panel
+
+| label | plain meaning |
+|---|---|
+| norm | how loud that workstation is for this word |
+| lens top-3 | what that station alone would say next if it were the last one. Early stations guess nonsense; late stations agree with the final answer. |
+| neurons top-32 | the strongest workers at that station for this word, ranked by strength with their sign |
+| topk | the model's next-word shortlist with probabilities |
+| steered / causal | whether THIS word was actually written while a knob was active |
+| xy | a 2-D sketch of the word's path — a projection, and the printed % says how much of it the sketch captures |
+
+#### Which knob for which job
+
+| you want | use |
+|---|---|
+| it to answer something else mid-answer | inject (a concrete question) |
+| a clean restart | edit_prompt |
+| a different kind of answer (code vs prose, tone) | steer |
+| to see what one worker is doing | steer a neuron |
+| it to stop | Esc |
 
 ---
 
@@ -190,7 +281,7 @@ architectures are **refused**, never guessed.
 | C1 trace | PASS — matches HF hidden states, max diff `0.000e+00` |
 | C2 logit lens | PASS — `0.000e+00` at the final layer |
 | C3 causal patching | PASS — L22–27 recover ≈1.0, L0–20 ≈0 |
-| C4 steering specificity | **FAIL** — calibrated, 20 controls |
+| C4 steering specificity | **FAIL pre-fix** — calibrated, 20 controls · **passes post-fix** (screened, 5 controls; see below) |
 | C5 mid-generation | PASS — divergence begins after the switch |
 | C6 force vs steer | PASS for forcing; semantic arm provisional |
 | C7 neuron atlas | PASS at threshold 1e-6 (coverage, not meaning) |
@@ -208,6 +299,32 @@ At a realistic perturbation the vector moves the target slightly the wrong way,
 and only 1 of 10 held-out prompts responds consistently. At 130× it produced
 +4.4 — that was saturation, not steering. **The slider changes output; it is a
 perturbation knob, not semantic control.**
+
+**C4 post-fix screening (2026-11-19).** Three defects were found and fixed after
+that run:
+
+1. `build_steer_vectors()` pooled **all** token positions, so at layers 9–39 the
+   contrast difference was ~99.9 % collinear with the *negative* of the
+   position-0 attention sink (‖h[0]‖ ≈ 4 800 vs 5–18 elsewhere; the 15-vs-9
+   token-count difference turned it into a length artefact, `cos ≈ −1.000`).
+   Position 0 is now excluded from pooling, and the default pairs share a
+   prefix and suffix around the function body so only the comment differs.
+2. The inserted comment sat **above** `def f(x):` while the held-out prompts
+   decide inside the body after `def …:\n` — the vector was teaching the wrong
+   location.
+3. `.hf/granite-hf` itself was wrong: the GGUF→HF conversion had not un-permuted
+   the Q/K rotary rows, so every attention head in all 40 layers used scrambled
+   positional angles (baseline output was degraded: "Paris Paris, France.",
+   "Cats are do not"). Fixed in `registry.py`/`convert.py`, and the artefact was
+   corrected in place.
+
+With the corrected vector at coef 1: **T1 +2.37 (L8) / +2.95 (L12) / +3.24
+(L14)** against a matched random max of +0.96, and **10/10 held-out sign
+consistency** (5 random controls — the full 20-control rerun is pending).
+Generated completions at coef 1 write context-appropriate comments
+(`# initialize the result` for `def merge(a, b):`,
+`# Use aiohttp to get the response` for `async def fetch(url):`) where the same
+prompts wrote plain code at coef 0.
 
 Also proven the hard way: quantisation hid a failure (Q4 passed where bf16 did
 not), a BF16→FP16 cast silently produces NaN, and a half-installed `next`
@@ -293,7 +410,9 @@ upper bound on zero flips); 384 narrows it to ~1%.
   neuron is an index, not a word.
 - **The 3-D view is a projection.** `z` is layer order (real); `x/y` are PCA.
   Variance explained is printed because it matters.
-- **Steering is not solved.** See C4 above.
+- **Steering: estimator fixed 2026-11-19, re-certification pending.** The
+  direction now carries the intended semantics at coef 1 (§5); the 20-control
+  rerun that would retire the old FAIL row has not been run yet.
 - **Long context is not tested.** 32k is configured; nothing here validates it.
 
 ---

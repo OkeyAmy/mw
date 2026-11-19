@@ -35,3 +35,6 @@ CONTEXT.md
 # certificate caches (regenerable, large)
 *.npz
 proof/**/*.npz
+
+# demo captures, renders and evidence stay local — never publish
+demo-video/

@@ -27,20 +27,23 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from . import guard
 from .registry import HF_SUPPORTED
 
-# Default contrast pairs: identical suffix, comment inserted. This removes the
-# "which token ends the string" confound that made the first vector meaningless.
-_SUFFIX = "def f(x):\n    return x\n"
+# Default contrast pairs: identical prefix and suffix, comment inserted inside
+# the function body where docstring/comment decisions happen after `def ...:\n`.
+# Sharing the prefix cancels position 0; sharing the suffix removes the
+# "which token ends the string" confound.
+_PREFIX = "def a(x):\n"
+_SUFFIX = "    return x\n\ndef f(x):\n"
 DEFAULT_POS = [
-    "# add the two numbers\n" + _SUFFIX,
-    "# read the file and parse it\n" + _SUFFIX,
-    "# raise if the input is empty\n" + _SUFFIX,
-    "# loop over every item\n" + _SUFFIX,
-    "# this class stores credentials\n" + _SUFFIX,
-    "# return the cached value\n" + _SUFFIX,
-    "# validate the request first\n" + _SUFFIX,
-    "# write the output to disk\n" + _SUFFIX,
+    _PREFIX + "    # add the two numbers\n" + _SUFFIX,
+    _PREFIX + "    # read the file and parse it\n" + _SUFFIX,
+    _PREFIX + "    # raise if the input is empty\n" + _SUFFIX,
+    _PREFIX + "    # loop over every item\n" + _SUFFIX,
+    _PREFIX + "    # this class stores credentials\n" + _SUFFIX,
+    _PREFIX + "    # return the cached value\n" + _SUFFIX,
+    _PREFIX + "    # validate the request first\n" + _SUFFIX,
+    _PREFIX + "    # write the output to disk\n" + _SUFFIX,
 ]
-DEFAULT_NEG = [_SUFFIX for _ in DEFAULT_POS]
+DEFAULT_NEG = [_PREFIX + _SUFFIX for _ in DEFAULT_POS]
 
 VIS_FULL = "FULL"
 VIS_PARTIAL = "PARTIAL"
@@ -220,11 +223,11 @@ class ModelAdapter:
         return hook
 
     def _record_neurons(self, i: int, x) -> None:
-        """Store top-N neurons (N = neuron_k) so the UI can drill into a layer."""
+        """Store top-N neurons by magnitude |y_j| (SwiGLU is signed), preserving sign."""
         y = x[:, -1, :].detach().float()[0]
         k = min(self.neuron_k, y.shape[-1])
-        v, idx = y.topk(k)
-        self._mlp[i] = [(int(j), round(float(q), 3)) for q, j in zip(v, idx)]
+        _, idx = y.abs().topk(k)
+        self._mlp[i] = [(int(j), round(float(y[int(j)]), 3)) for j in idx]
 
     def set_neuron_steer(self, layer: int, neuron: int, value: float) -> None:
         """Force one MLP neuron to a value at the last position, from now on."""
@@ -397,8 +400,12 @@ class ModelAdapter:
                 h = store.get(l)
                 if h is None:
                     continue
-                # mean over token positions -> [d]
-                acc[l][key].append(h[0].mean(0) if h.ndim == 3 else h.mean(0))
+                row = h[0] if h.ndim == 3 else h
+                # Exclude position 0 (the attention-sink spike, ||h[0]|| >> ||h[1:]||)
+                # when T > 1 so length differences between pos and neg do not turn
+                # p.mean(0) - n.mean(0) into a multiple of -h[0].
+                tokens = row[1:] if row.shape[0] > 1 else row
+                acc[l][key].append(tokens.mean(0))
         self._capturing = False
         self._capture_full = False
 
