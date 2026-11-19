@@ -1,0 +1,26 @@
+{
+  "test": "C4",
+  "run": "code/verify_c4.py --randoms 20",
+  "date": "2026-11-19",
+  "model": ".hf/bf16-hf",
+  "instrument_changes_since_previous_run": [
+    "build_steer_vectors excludes token 0 attention sink (row[1:]) before pooling",
+    "DEFAULT_POS/NEG share a prefix and suffix around the function body",
+    "granite Q/K RoPE rows unpermuted (does not affect this qwen2 run)"
+  ],
+  "layer": 16,
+  "coef": 1.0,
+  "real": {
+    "target_effect": 3.542650032043457,
+    "control_collateral": 3.0424102783203124,
+    "heldout_sign": 1.0
+  },
+  "random_p95_target": 1.9964479446411132,
+  "random_median_control": 2.6086985588073732,
+  "random_p95_sign": 1.0,
+  "T1_selectivity": true,
+  "T2_collateral": false,
+  "T4_heldout_sign": false,
+  "T3_behaviour": "not run (needs generation; run steering_test.py)",
+  "verdict": "target effect re-established beyond the random p95, but random matched-norm directions are equally sign-consistent and have lower collateral; do not claim unique semantic control"
+}

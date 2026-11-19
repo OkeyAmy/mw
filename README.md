@@ -146,13 +146,12 @@ otherwise `correlation, not meaning`.
      contrast pairs (comment-style vs code-style prompts).
    - *What might happen:* output changes character; large coefficients produce
      repetition, empty lines, or derailment. `coef = 0` is bit-identical to off.
-   - *Honest status (updated 2026-11-19):* the estimator that built `v` had two
-     defects — position-0 attention-sink contamination, and the comment placed
-     above the function header where the held-out prompts never test it. With
-     both fixed the direction moves the intended target +2.4…+3.2 nats at
-     coef 1 with 10/10 held-out sign consistency (screened against 5 matched
-     random controls; the full 20-control rerun is pending). §5 records both
-     runs.
+   - *Honest status (updated 2026-11-19, full 20-control rerun):* the repaired
+     vector has a real, significantly-above-random target pull (L16 +3.54 vs
+     p95 +2.00, T1 PASS), and it moved all 10 held-out prompts positive. It is
+     **not** uniquely semantic: collateral 3.04 > random median 2.61 (T2 FAIL)
+     and 4/20 random directions were also 10/10 sign consistent (T4 FAIL).
+     It is a strong, directional nudge, not proof of concept-level control.
 
 2. **Steer neuron** (index + value → `apply`, or `ablate`)
    - Writes an absolute value into that MLP unit at the last position, for
@@ -281,7 +280,7 @@ architectures are **refused**, never guessed.
 | C1 trace | PASS — matches HF hidden states, max diff `0.000e+00` |
 | C2 logit lens | PASS — `0.000e+00` at the final layer |
 | C3 causal patching | PASS — L22–27 recover ≈1.0, L0–20 ≈0 |
-| C4 steering specificity | **FAIL pre-fix** — calibrated, 20 controls · **passes post-fix** (screened, 5 controls; see below) |
+| C4 steering specificity | pre-fix **FAIL** · post-fix **T1 PASS, T2/T4 FAIL** (full 20-control rerun below) |
 | C5 mid-generation | PASS — divergence begins after the switch |
 | C6 force vs steer | PASS for forcing; semantic arm provisional |
 | C7 neuron atlas | PASS at threshold 1e-6 (coverage, not meaning) |
@@ -318,13 +317,30 @@ that run:
    "Cats are do not"). Fixed in `registry.py`/`convert.py`, and the artefact was
    corrected in place.
 
-With the corrected vector at coef 1: **T1 +2.37 (L8) / +2.95 (L12) / +3.24
-(L14)** against a matched random max of +0.96, and **10/10 held-out sign
-consistency** (5 random controls — the full 20-control rerun is pending).
+**Full 20-control rerun (2026-11-19, `code/verify_c4.py --randoms 20`, Qwen
+bf16-hf).** The repaired estimator is confirmed — and the qualifier matters:
+
+```
+L8  coef+1: target=+2.372  control=2.701  sign=1.00
+L16 coef+1: target=+3.543  control=3.042  sign=1.00
+
+T1 selectivity  : PASS   real +3.543  > random p95 +1.996
+T2 collateral   : FAIL   real  3.042  > random median 2.609
+T4 held-out sign: FAIL   real  1.00  NOT > random p95 1.00 (4/20 randoms also 10/10)
+```
+
+So the repaired steering vector produces a **stronger-than-random pull toward
+comments**, and that pull is sign-consistent on **all 10 held-out prompts**. It
+does **not** establish unique semantic control: matched random directions are
+also consistently positive in 4/20 cases, and their collateral is lower. That is
+the honest claim to make, on camera and here. Raw controls and verdict:
+`proof/c4_post_fix_20controls.txt` + `.json`.
+
 Generated completions at coef 1 write context-appropriate comments
 (`# initialize the result` for `def merge(a, b):`,
 `# Use aiohttp to get the response` for `async def fetch(url):`) where the same
-prompts wrote plain code at coef 0.
+prompts wrote plain code at coef 0 — a readable illustration, not a
+substitute for the control comparison above.
 
 Also proven the hard way: quantisation hid a failure (Q4 passed where bf16 did
 not), a BF16→FP16 cast silently produces NaN, and a half-installed `next`
@@ -410,9 +426,11 @@ upper bound on zero flips); 384 narrows it to ~1%.
   neuron is an index, not a word.
 - **The 3-D view is a projection.** `z` is layer order (real); `x/y` are PCA.
   Variance explained is printed because it matters.
-- **Steering: estimator fixed 2026-11-19, re-certification pending.** The
-  direction now carries the intended semantics at coef 1 (§5); the 20-control
-  rerun that would retire the old FAIL row has not been run yet.
+- **Steering: target effect proven, specificity unresolved.** The estimator fix
+  (2026-11-19) gives a real, sign-consistent, above-random pull (T1 PASS at
+  coef 1). Random matched-norm directions are also sign consistent (T4 FAIL)
+  and cheaper on collateral (T2 FAIL) — so the knob is a directional poke, not
+  certified semantic control. Full rerun in §5 and `proof/c4_post_fix_20controls.txt`.
 - **Long context is not tested.** 32k is configured; nothing here validates it.
 
 ---

@@ -1,0 +1,55 @@
+C4 POST-FIX — full 20-random-control rerun (2026-11-19)
+=======================================================
+run     : PYTHONPATH=code python code/verify_c4.py --randoms 20
+model   : .hf/bf16-hf (Qwen 2.5 Coder 1.5B, fp32)
+unit    : coef 1 = one mean last-position residual norm
+heldout : 10 prompts that were not in DEFAULT_POS
+
+Calibration scales (post-fix estimator)
+---------------------------------------
+vectors: 28 layers, calibrated to residual norm, 64.6 s
+L8  norm = 28.2, max cos to token emb = 0.0791
+L16 norm = 37.1, max cos to token emb = 0.0950
+L0  norm = 0.6,  max cos to token emb = 0.4041
+
+Real direction
+--------------
+L8  coef+1: target=+2.372  control=2.701  sign=1.00
+L16 coef+1: target=+3.543  control=3.042  sign=1.00   <- best layer
+
+20 random matched-norm controls at L16
+---------------------------------------
+01 target=+0.01 control=2.49 sign=0.40
+02 target=+0.24 control=1.42 sign=0.70
+03 target=-0.51 control=2.61 sign=0.20
+04 target=+0.60 control=2.73 sign=0.80
+05 target=+1.95 control=1.81 sign=1.00
+06 target=-0.17 control=3.40 sign=0.50
+07 target=-1.40 control=2.88 sign=0.10
+08 target=+0.09 control=3.36 sign=0.70
+09 target=+2.00 control=2.16 sign=1.00
+10 target=+2.36 control=4.07 sign=1.00
+11 target=+0.28 control=3.97 sign=0.70
+12 target=-2.03 control=3.42 sign=0.00
+13 target=+0.63 control=2.40 sign=0.90
+14 target=+0.13 control=2.20 sign=0.80
+15 target=-0.21 control=3.00 sign=0.50
+16 target=-0.14 control=3.53 sign=0.40
+17 target=+0.24 control=1.91 sign=0.70
+18 target=+0.98 control=1.35 sign=0.90
+19 target=-0.78 control=2.30 sign=0.00
+20 target=+0.97 control=1.74 sign=1.00
+
+Verdict
+-------
+T1 selectivity  : PASS  real +3.543  > random p95 +1.996
+T2 collateral   : FAIL  real  3.042  > random median 2.609
+T4 held-out sign: FAIL  real  1.00  NOT > random p95 1.00 (4/20 random vectors also 10/10)
+T3 behaviour    : not run (generation-level; see steering_test.py)
+
+The repaired estimator produces a real, strongly positive, sign-consistent
+target effect on every held-out prompt. It does NOT establish unique semantic
+control: matched random directions are also consistently positive on 10/10
+prompts in four cases, and their collateral is lower. Honest statement:
+"the steering vector has a stronger-than-random pull toward comments;
+sign consistency alone is not proof that the direction is special."
