@@ -45,11 +45,17 @@ DEFAULT_POS = [
 ]
 DEFAULT_NEG = [_PREFIX + _SUFFIX for _ in DEFAULT_POS]
 
+# NOTE (H22): these pairs indent with 4 SPACES, while Granite's own completions
+# use TABS ("\tresult = []"). The contrast is therefore partly an
+# indentation-style direction, not a pure semantic "comment" direction; it does
+# not affect the arithmetic, only the strength of the mechanism story.
+
 VIS_FULL = "FULL"
 VIS_PARTIAL = "PARTIAL"
 VIS_BLACKBOX = "BLACKBOX"
 
 SITES = ("pre", "post")
+POSITIONS = ("pooled", "last")
 
 
 class CapabilityError(RuntimeError):
@@ -369,19 +375,37 @@ class ModelAdapter:
     @torch.no_grad()
     def build_steer_vectors(self, pos: list[str] | None = None,
                             neg: list[str] | None = None,
-                            site: str = "pre") -> dict[int, torch.Tensor]:
+                            site: str = "pre",
+                            position: str = "pooled") -> dict[int, torch.Tensor]:
         """Contrast-pair vectors for EVERY layer, built at the steering site.
 
+        `position` makes the extraction site explicit (H9):
+
+          * ``"pooled"`` (default, the vector the app ships): mean over token
+            positions 1..T-1 (position 0 is the attention-sink spike and is
+            excluded). This is an average-of-sequence direction.
+          * ``"last"``: the residual at the final position only. This is the
+            aligned choice for ``set_steer(..., positions="last")``, because
+            that is the one position the hook writes; ``"pooled"`` applied at
+            that single position is a *different* intervention, not a
+            different estimator of the same one.
+
+        `site` and the later `set_steer(site=...)` must match: both default to
+        ``"pre"``, i.e. ``resid_pre`` for the same layer index. Building at
+        ``site="post"`` and injecting at ``"pre"`` is an off-by-one block.
+
         Two fixes forced by the H3 audit:
-          1. Average over ALL token positions, not the last one. Last-token
-             vectors were measuring "which token ends the string" (cos 1.0 with
-             an embedding difference), not the contrast.
-          2. Default pairs share an identical suffix, so the only difference is
-             the inserted comment. That removes the final-token confound by
+          1. Default pairs share an identical suffix, so the only difference is
+             the inserted comment; that removes the final-token confound by
              construction.
+          2. Averaging (``"pooled"``) was the first fix for last-token identity
+             artefacts. It is kept as the default so app behaviour does not
+             change; ``"last"`` is available for the aligned comparison.
         """
         if site not in SITES:
             raise ValueError(f"site must be one of {SITES}")
+        if position not in POSITIONS:
+            raise ValueError(f"position must be one of {POSITIONS}")
         pos = pos if pos is not None else list(DEFAULT_POS)
         neg = neg if neg is not None else list(DEFAULT_NEG)
         if len(pos) != len(neg):
@@ -401,6 +425,9 @@ class ModelAdapter:
                 if h is None:
                     continue
                 row = h[0] if h.ndim == 3 else h
+                if position == "last":
+                    acc[l][key].append(row[-1])
+                    continue
                 # Exclude position 0 (the attention-sink spike, ||h[0]|| >> ||h[1:]||)
                 # when T > 1 so length differences between pos and neg do not turn
                 # p.mean(0) - n.mean(0) into a multiple of -h[0].

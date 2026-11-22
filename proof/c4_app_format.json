@@ -1,0 +1,539 @@
+{
+  "generated": "2026-11-22T14:44:54+00:00",
+  "updated": "2026-11-22T14:57:45+00:00",
+  "config": {
+    "model": ".hf/granite-hf",
+    "layers": 40,
+    "vocab": 49159,
+    "d": 2048,
+    "dtype": "torch.float32",
+    "layer": 8,
+    "build_layer": 7,
+    "coef": 1.0,
+    "logits_scaling": 8.0,
+    "site": "steer at resid_pre(L8) via the daemon's layer-8 pre-hook (== set_steer(site='pre')); build at resid_post(L7) == resid_pre(L8)",
+    "unit": {
+      "value": 5.345865964889526,
+      "definition": "mean last-position resid_pre(L8) norm of the chat-rendered DEFAULT_POS[0] and DEFAULT_NEG[0] prompts \u2014 app residual_scale() (server.py:517-555,847-849)",
+      "pos0": 5.336301326751709,
+      "neg0": 5.355430603027344
+    },
+    "vectors": {
+      "raw_norm": {
+        "pooled": 1.0688086867062154,
+        "last": 0.8878268518615248
+      },
+      "unit_norm": {
+        "pooled": 5.345865964889528,
+        "last": 5.345865964889527
+      },
+      "cos_pooled_last": 0.23725644392594733,
+      "build_render": "raw (adapter.build_steer_vectors tokenises the text directly; chat templating is used for the unit only)"
+    },
+    "token_sets": {
+      "comment_ids": [
+        21,
+        433,
+        588
+      ],
+      "code_ids": [
+        106,
+        264,
+        325,
+        589,
+        601,
+        784,
+        823,
+        979
+      ]
+    },
+    "n_prompts": 10,
+    "nats_unit": {
+      "logits_scaling_config": 8.0,
+      "applied_inside_model": true,
+      "source": "transformers GraniteForCausalLM.forward: logits = lm_head(hidden_states) / config.logits_scaling",
+      "app_confirms": "code/mw/adapter.py:295 divides the lens by the same factor",
+      "measured_max_abs_logit": 20.548175811767578,
+      "measured_p_top": 0.7427619288998343,
+      "measured_entropy_nats": 1.324680081644297,
+      "conclusion": "returned logit gaps are nats; dividing by 8 again (K3 H18 / K5 convention) double-counts logits_scaling"
+    }
+  },
+  "arms": [
+    {
+      "id": "chat_pooled",
+      "position": "pooled",
+      "render": "chat",
+      "coef": 1.0,
+      "te_raw_mean": -1.2603822125300979,
+      "te_nats_mean": -1.2603822125300979,
+      "te_nats_median": -1.466254876261377,
+      "te_nats_min": -2.5589005916017156,
+      "te_nats_max": 1.5631805419690181,
+      "te_nats_k3_div_scaling_mean": -0.15754777656626223,
+      "te_signflip_p_vs_zero": 0.015625,
+      "kl_nats_mean": 1.718572595413463,
+      "kl_nats_median": 0.8259113553543641,
+      "kl_nats_worst": 10.507774943382948,
+      "signs": [
+        -1,
+        1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "n_pos": 1,
+      "n_neg": 9,
+      "n_zero": 0,
+      "per_prompt": [
+        {
+          "prompt": "def merge(a, b):\\n",
+          "te_raw": -0.9638828705763043,
+          "te_nats": -0.9638828705763043,
+          "kl_nats": 1.0698633124445902,
+          "max_abs_logit_delta": 6.028533458709717,
+          "te_nats_k3_div_scaling": -0.12048535882203804
+        },
+        {
+          "prompt": "class Cache:\\n",
+          "te_raw": 1.5631805419690181,
+          "te_nats": 1.5631805419690181,
+          "kl_nats": 10.507774943382948,
+          "max_abs_logit_delta": 12.64310359954834,
+          "te_nats_k3_div_scaling": 0.19539756774612727
+        },
+        {
+          "prompt": "async def fetch(url):\\n",
+          "te_raw": -2.0922017515852778,
+          "te_nats": -2.0922017515852778,
+          "kl_nats": 0.6957725115818924,
+          "max_abs_logit_delta": 5.965332627296448,
+          "te_nats_k3_div_scaling": -0.2615252189481597
+        },
+        {
+          "prompt": "def parse(x):\\n",
+          "te_raw": -2.5238983578699417,
+          "te_nats": -2.5238983578699417,
+          "kl_nats": 0.9992204445243629,
+          "max_abs_logit_delta": 5.965915739536285,
+          "te_nats_k3_div_scaling": -0.3154872947337427
+        },
+        {
+          "prompt": "with open(path) as fh:\\n",
+          "te_raw": -0.6414074749227412,
+          "te_nats": -0.6414074749227412,
+          "kl_nats": 0.05982586578754779,
+          "max_abs_logit_delta": 3.5080121755599976,
+          "te_nats_k3_div_scaling": -0.08017593436534265
+        },
+        {
+          "prompt": "while queue:\\n",
+          "te_raw": -1.6407729196989624,
+          "te_nats": -1.6407729196989624,
+          "kl_nats": 0.5961277420741735,
+          "max_abs_logit_delta": 4.71342134475708,
+          "te_nats_k3_div_scaling": -0.2050966149623703
+        },
+        {
+          "prompt": "def to_json(obj):\\n",
+          "te_raw": -1.4183054969601567,
+          "te_nats": -1.4183054969601567,
+          "kl_nats": 0.9560501991268359,
+          "max_abs_logit_delta": 6.894872486591339,
+          "te_nats_k3_div_scaling": -0.1772881871200196
+        },
+        {
+          "prompt": "for k, v in d.items():\\n",
+          "te_raw": -0.8134289484923025,
+          "te_nats": -0.8134289484923025,
+          "kl_nats": 0.10705003490728095,
+          "max_abs_logit_delta": 5.017341494560242,
+          "te_nats_k3_div_scaling": -0.10167861856153781
+        },
+        {
+          "prompt": "def main():\\n",
+          "te_raw": -2.5589005916017156,
+          "te_nats": -2.5589005916017156,
+          "kl_nats": 0.6292457531559795,
+          "max_abs_logit_delta": 5.536481857299805,
+          "te_nats_k3_div_scaling": -0.31986257395021445
+        },
+        {
+          "prompt": "try:\\n",
+          "te_raw": -1.5142042555625972,
+          "te_nats": -1.5142042555625972,
+          "kl_nats": 1.5647951471490176,
+          "max_abs_logit_delta": 6.99074387550354,
+          "te_nats_k3_div_scaling": -0.18927553194532465
+        }
+      ],
+      "null": null,
+      "verdict": "NO_EFFECT",
+      "verdict_note": "target effect is not positive in the app format; the direction does not steer the concept",
+      "seconds": 66.7
+    },
+    {
+      "id": "chat_last",
+      "position": "last",
+      "render": "chat",
+      "coef": 1.0,
+      "te_raw_mean": -0.9913180155979997,
+      "te_nats_mean": -0.9913180155979997,
+      "te_nats_median": -0.7195673261792868,
+      "te_nats_min": -3.7059294617676315,
+      "te_nats_max": -0.2015610818218434,
+      "te_nats_k3_div_scaling_mean": -0.12391475194974996,
+      "te_signflip_p_vs_zero": 0.001953125,
+      "kl_nats_mean": 1.905492014001171,
+      "kl_nats_median": 1.0214026047824198,
+      "kl_nats_worst": 6.429631960510326,
+      "signs": [
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "n_pos": 0,
+      "n_neg": 10,
+      "n_zero": 0,
+      "per_prompt": [
+        {
+          "prompt": "def merge(a, b):\\n",
+          "te_raw": -0.6548680405632803,
+          "te_nats": -0.6548680405632803,
+          "kl_nats": 4.459869447858152,
+          "max_abs_logit_delta": 10.724542617797852,
+          "te_nats_k3_div_scaling": -0.08185850507041004
+        },
+        {
+          "prompt": "class Cache:\\n",
+          "te_raw": -0.2015610818218434,
+          "te_nats": -0.2015610818218434,
+          "kl_nats": 2.1300889286887563,
+          "max_abs_logit_delta": 6.865755081176758,
+          "te_nats_k3_div_scaling": -0.025195135227730425
+        },
+        {
+          "prompt": "async def fetch(url):\\n",
+          "te_raw": -0.21142320243271584,
+          "te_nats": -0.21142320243271584,
+          "kl_nats": 2.7997694310412355,
+          "max_abs_logit_delta": 7.980593681335449,
+          "te_nats_k3_div_scaling": -0.02642790030408948
+        },
+        {
+          "prompt": "def parse(x):\\n",
+          "te_raw": -1.6591767896175407,
+          "te_nats": -1.6591767896175407,
+          "kl_nats": 1.161129529396946,
+          "max_abs_logit_delta": 9.917963027954102,
+          "te_nats_k3_div_scaling": -0.20739709870219258
+        },
+        {
+          "prompt": "with open(path) as fh:\\n",
+          "te_raw": -0.20893234495476332,
+          "te_nats": -0.20893234495476332,
+          "kl_nats": 0.03736903071330035,
+          "max_abs_logit_delta": 6.976192474365234,
+          "te_nats_k3_div_scaling": -0.026116543119345415
+        },
+        {
+          "prompt": "while queue:\\n",
+          "te_raw": -0.8886199715892973,
+          "te_nats": -0.8886199715892973,
+          "kl_nats": 0.3817587927991435,
+          "max_abs_logit_delta": 8.826096057891846,
+          "te_nats_k3_div_scaling": -0.11107749644866216
+        },
+        {
+          "prompt": "def to_json(obj):\\n",
+          "te_raw": -0.6363363190700166,
+          "te_nats": -0.6363363190700166,
+          "kl_nats": 6.429631960510326,
+          "max_abs_logit_delta": 10.428027153015137,
+          "te_nats_k3_div_scaling": -0.07954203988375208
+        },
+        {
+          "prompt": "for k, v in d.items():\\n",
+          "te_raw": -0.7842666117952932,
+          "te_nats": -0.7842666117952932,
+          "kl_nats": 0.0955231042951378,
+          "max_abs_logit_delta": 4.182330131530762,
+          "te_nats_k3_div_scaling": -0.09803332647441165
+        },
+        {
+          "prompt": "def main():\\n",
+          "te_raw": -3.7059294617676315,
+          "te_nats": -3.7059294617676315,
+          "kl_nats": 0.8816756801678935,
+          "max_abs_logit_delta": 5.6564671993255615,
+          "te_nats_k3_div_scaling": -0.46324118272095394
+        },
+        {
+          "prompt": "try:\\n",
+          "te_raw": -0.9620663323676162,
+          "te_nats": -0.9620663323676162,
+          "kl_nats": 0.6781042345408174,
+          "max_abs_logit_delta": 6.412205338478088,
+          "te_nats_k3_div_scaling": -0.12025829154595202
+        }
+      ],
+      "null": null,
+      "verdict": "NO_EFFECT",
+      "verdict_note": "target effect is not positive in the app format; the direction does not steer the concept",
+      "seconds": 65.8
+    },
+    {
+      "id": "raw_pooled",
+      "position": "pooled",
+      "render": "raw",
+      "coef": 1.0,
+      "te_raw_mean": 4.348564127871011,
+      "te_nats_mean": 4.348564127871011,
+      "te_nats_median": 4.2520767612242505,
+      "te_nats_min": -0.23350912065192997,
+      "te_nats_max": 7.800618525696522,
+      "te_nats_k3_div_scaling_mean": 0.5435705159838764,
+      "te_signflip_p_vs_zero": 0.00390625,
+      "kl_nats_mean": 3.1394661244436524,
+      "kl_nats_median": 4.040929858973725,
+      "kl_nats_worst": 4.460925226312389,
+      "signs": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        -1
+      ],
+      "n_pos": 9,
+      "n_neg": 1,
+      "n_zero": 0,
+      "per_prompt": [
+        {
+          "prompt": "def merge(a, b):\\n",
+          "te_raw": 3.7424011881868218,
+          "te_nats": 3.7424011881868218,
+          "kl_nats": 4.163698336772881,
+          "max_abs_logit_delta": 7.377743899822235,
+          "te_nats_k3_div_scaling": 0.4678001485233527
+        },
+        {
+          "prompt": "class Cache:\\n",
+          "te_raw": 5.551136330481135,
+          "te_nats": 5.551136330481135,
+          "kl_nats": 3.952991696005255,
+          "max_abs_logit_delta": 8.198558330535889,
+          "te_nats_k3_div_scaling": 0.6938920413101419
+        },
+        {
+          "prompt": "async def fetch(url):\\n",
+          "te_raw": 6.2652298530037385,
+          "te_nats": 6.2652298530037385,
+          "kl_nats": 2.2852769274658127,
+          "max_abs_logit_delta": 7.420567274093628,
+          "te_nats_k3_div_scaling": 0.7831537316254673
+        },
+        {
+          "prompt": "def parse(x):\\n",
+          "te_raw": 4.761752334261679,
+          "te_nats": 4.761752334261679,
+          "kl_nats": 4.460925226312389,
+          "max_abs_logit_delta": 7.247537612915039,
+          "te_nats_k3_div_scaling": 0.5952190417827099
+        },
+        {
+          "prompt": "with open(path) as fh:\\n",
+          "te_raw": 7.611461840393226,
+          "te_nats": 7.611461840393226,
+          "kl_nats": 4.128868021942195,
+          "max_abs_logit_delta": 9.637727975845337,
+          "te_nats_k3_div_scaling": 0.9514327300491533
+        },
+        {
+          "prompt": "while queue:\\n",
+          "te_raw": 1.2216887193127697,
+          "te_nats": 1.2216887193127697,
+          "kl_nats": 1.2126844001477082,
+          "max_abs_logit_delta": 5.156894087791443,
+          "te_nats_k3_div_scaling": 0.1527110899140962
+        },
+        {
+          "prompt": "def to_json(obj):\\n",
+          "te_raw": 7.800618525696522,
+          "te_nats": 7.800618525696522,
+          "kl_nats": 4.23767036752208,
+          "max_abs_logit_delta": 9.219898462295532,
+          "te_nats_k3_div_scaling": 0.9750773157120652
+        },
+        {
+          "prompt": "for k, v in d.items():\\n",
+          "te_raw": 3.377616346520071,
+          "te_nats": 3.377616346520071,
+          "kl_nats": 4.174522242830882,
+          "max_abs_logit_delta": 8.098030090332031,
+          "te_nats_k3_div_scaling": 0.4222020433150089
+        },
+        {
+          "prompt": "def main():\\n",
+          "te_raw": 3.387245261506079,
+          "te_nats": 3.387245261506079,
+          "kl_nats": 2.242019483070403,
+          "max_abs_logit_delta": 9.572960257530212,
+          "te_nats_k3_div_scaling": 0.4234056576882599
+        },
+        {
+          "prompt": "try:\\n",
+          "te_raw": -0.23350912065192997,
+          "te_nats": -0.23350912065192997,
+          "kl_nats": 0.5360045423669185,
+          "max_abs_logit_delta": 4.309378623962402,
+          "te_nats_k3_div_scaling": -0.029188640081491246
+        }
+      ],
+      "null": null,
+      "verdict": "ABLATION_EFFECT",
+      "verdict_note": "raw render is not the app format (K3 H4); ablation only",
+      "seconds": 34.4
+    },
+    {
+      "id": "raw_last",
+      "position": "last",
+      "render": "raw",
+      "coef": 1.0,
+      "te_raw_mean": 1.372197392879158,
+      "te_nats_mean": 1.372197392879158,
+      "te_nats_median": 1.4737176742895364,
+      "te_nats_min": -0.21472061239154883,
+      "te_nats_max": 2.774167617611825,
+      "te_nats_k3_div_scaling_mean": 0.17152467410989475,
+      "te_signflip_p_vs_zero": 0.005859375,
+      "kl_nats_mean": 0.5783924790821318,
+      "kl_nats_median": 0.5571325394829807,
+      "kl_nats_worst": 1.6187063223648115,
+      "signs": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        -1
+      ],
+      "n_pos": 9,
+      "n_neg": 1,
+      "n_zero": 0,
+      "per_prompt": [
+        {
+          "prompt": "def merge(a, b):\\n",
+          "te_raw": 1.8173217321601882,
+          "te_nats": 1.8173217321601882,
+          "kl_nats": 0.1965673920116913,
+          "max_abs_logit_delta": 5.866371035575867,
+          "te_nats_k3_div_scaling": 0.22716521652002353
+        },
+        {
+          "prompt": "class Cache:\\n",
+          "te_raw": 2.184728329643063,
+          "te_nats": 2.184728329643063,
+          "kl_nats": 0.7464950352878483,
+          "max_abs_logit_delta": 5.368997812271118,
+          "te_nats_k3_div_scaling": 0.27309104120538286
+        },
+        {
+          "prompt": "async def fetch(url):\\n",
+          "te_raw": 1.1301136164188845,
+          "te_nats": 1.1301136164188845,
+          "kl_nats": 0.719512184416883,
+          "max_abs_logit_delta": 4.66823410987854,
+          "te_nats_k3_div_scaling": 0.14126420205236057
+        },
+        {
+          "prompt": "def parse(x):\\n",
+          "te_raw": 2.2283692822498615,
+          "te_nats": 2.2283692822498615,
+          "kl_nats": 0.31064470792510446,
+          "max_abs_logit_delta": 4.371109247207642,
+          "te_nats_k3_div_scaling": 0.2785461602812327
+        },
+        {
+          "prompt": "with open(path) as fh:\\n",
+          "te_raw": 1.1029343730894379,
+          "te_nats": 1.1029343730894379,
+          "kl_nats": 0.6960846026659103,
+          "max_abs_logit_delta": 6.308893442153931,
+          "te_nats_k3_div_scaling": 0.13786679663617973
+        },
+        {
+          "prompt": "while queue:\\n",
+          "te_raw": 0.809437058942569,
+          "te_nats": 0.809437058942569,
+          "kl_nats": 0.5063919797430607,
+          "max_abs_logit_delta": 3.72369921207428,
+          "te_nats_k3_div_scaling": 0.10117963236782113
+        },
+        {
+          "prompt": "def to_json(obj):\\n",
+          "te_raw": 2.774167617611825,
+          "te_nats": 2.774167617611825,
+          "kl_nats": 1.6187063223648115,
+          "max_abs_logit_delta": 7.218204736709595,
+          "te_nats_k3_div_scaling": 0.34677095220147813
+        },
+        {
+          "prompt": "for k, v in d.items():\\n",
+          "te_raw": 1.8422126120901883,
+          "te_nats": 1.8422126120901883,
+          "kl_nats": 0.6078730992229006,
+          "max_abs_logit_delta": 4.7211334109306335,
+          "te_nats_k3_div_scaling": 0.23027657651127353
+        },
+        {
+          "prompt": "def main():\\n",
+          "te_raw": 0.04740991897711133,
+          "te_nats": 0.04740991897711133,
+          "kl_nats": 0.21332174660643266,
+          "max_abs_logit_delta": 5.621909976005554,
+          "te_nats_k3_div_scaling": 0.0059262398721389165
+        },
+        {
+          "prompt": "try:\\n",
+          "te_raw": -0.21472061239154883,
+          "te_nats": -0.21472061239154883,
+          "kl_nats": 0.16832772057667555,
+          "max_abs_logit_delta": 2.637105345726013,
+          "te_nats_k3_div_scaling": -0.026840076548943603
+        }
+      ],
+      "null": null,
+      "verdict": "ABLATION_EFFECT",
+      "verdict_note": "raw render is not the app format (K3 H4); ablation only",
+      "seconds": 32.8
+    }
+  ],
+  "recomputed": "2026-11-22T14:57:45+00:00",
+  "decisive_null": {
+    "n_run": 0,
+    "S": null,
+    "rank_p": null,
+    "reason": "no chat-format arm has a positive target effect; there is no effect to match, so S = KL_real / median(KL_null at matched te) is undefined and the pre-registered rule already says NO_EFFECT"
+  }
+}

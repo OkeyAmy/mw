@@ -32,6 +32,21 @@ from app.server import (
 VOCAB = 512
 EOS = 0
 
+# Long, identical suffix for the position tests. On random tiny weights the
+# short DEFAULT suffix leaves the pooled average and the final position
+# correlated (|cos| 0.58-0.69 at seed 0); a long shared suffix decorrelates
+# them (|cos| < 0.3 at every layer, seeds 0-5) so the assertion is about the
+# estimator, not about one lucky init. Granite L8 is |cos| 0.237.
+_LONG_SUFFIX = "".join(f"    v{i} = x[{i}]\n" for i in range(12)) + (
+    "    return x\n\ndef f(x):\n")
+LONG_POS = [
+    "def a(x):\n    # add the two numbers\n" + _LONG_SUFFIX,
+    "def a(x):\n    # read the file and parse it\n" + _LONG_SUFFIX,
+    "def a(x):\n    # raise if the input is empty\n" + _LONG_SUFFIX,
+    "def a(x):\n    # loop over every item\n" + _LONG_SUFFIX,
+]
+LONG_NEG = ["def a(x):\n" + _LONG_SUFFIX for _ in LONG_POS]
+
 
 class _Ids:
     def __init__(self, ids: torch.Tensor):
@@ -101,6 +116,41 @@ def test_vectors_are_nonzero_every_layer(vecs):
     assert not wrong, f"zero-norm steering vector(s): {wrong}"
 
 
+def test_position_last_matches_the_last_position_diff_in_means(ad):
+    """H9: the extraction position must be what the name says.
+
+    `diff_in_means` reads the final position (its capture is [1, d]). The
+    `position="last"` vector must be collinear with it; the pooled vector is an
+    average-of-sequence direction and must NOT be — those are two different
+    interventions, not two estimates of one. Measured on the tiny model; this
+    is a code-path sanity check, not a Granite claim (Granite L8: pooled vs
+    last-position diff is |cos| 0.237).
+    """
+    pooled = ad.build_steer_vectors(pos=LONG_POS, neg=LONG_NEG)
+    last = ad.build_steer_vectors(pos=LONG_POS, neg=LONG_NEG, position="last")
+    pairs = list(zip(LONG_POS, LONG_NEG))
+    for l in sorted(last):
+        ref = ad.diff_in_means(pairs, l, site="pre")
+        cos_last = abs(float(torch.nn.functional.cosine_similarity(last[l], ref, dim=0)))
+        cos_pool = abs(float(torch.nn.functional.cosine_similarity(pooled[l], ref, dim=0)))
+        assert cos_last > 0.9, f"L{l}: position='last' is not the last-position diff ({cos_last:.3f})"
+        assert cos_pool < 0.5, f"L{l}: pooled vector is not distinct from last ({cos_pool:.3f})"
+
+
+def test_pooled_remains_the_default_position(ad, vecs):
+    """The app behaviour must not change: the default is still the pooled
+    estimator, so `Engine` keeps shipping the vector it shipped before."""
+    explicit = ad.build_steer_vectors(position="pooled")
+    assert set(explicit) == set(vecs)
+    for l in vecs:
+        assert torch.equal(vecs[l], explicit[l]), f"L{l}: default position changed"
+
+
+def test_unknown_position_raises(ad):
+    with pytest.raises(ValueError, match="position must be one of"):
+        ad.build_steer_vectors(position="mean")
+
+
 def test_vector_is_not_a_last_token_embedding_delta(ad, vecs):
     """H3-3 regression: the estimator averages all positions, so at layer 0 the
     vector must NOT be collinear with the last-token embedding difference."""
@@ -125,10 +175,15 @@ def test_coef_zero_is_bit_identical(ad, ids, vecs):
 def test_vector_unit_is_one_residual_norm(ad, vecs):
     """PROTOCOL: one coef unit = the layer's residual norm.
 
-    `build_steer_vectors` normalises to ‖mean_t h‖ (uncentred, all positions),
-    which on a real model is inflated 14-42x at mid layers relative to the
-    position actually steered. `residual_scale` + `calibrate_vectors` restore
-    the documented unit at the last position; the direction must not change.
+    This test checks that `residual_scale` + `calibrate_vectors` are
+    self-consistent: every calibrated vector has the measured scale's norm and
+    the direction is untouched, and a second pass is a no-op. It does NOT
+    verify the size of the correction.
+
+    The old docstring claimed the shipped vector was "inflated 14-42x at mid
+    layers". That number belongs to the PRE-FIX estimator that included
+    position 0; the shipped pooled vector (positions 1..T-1) is 0.62-0.66x the
+    last-position norm at L8/L9 on Granite, i.e. the rescale is ~1.2-1.5x.
     """
     import app.server as srv
 

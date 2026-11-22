@@ -146,12 +146,14 @@ otherwise `correlation, not meaning`.
      contrast pairs (comment-style vs code-style prompts).
    - *What might happen:* output changes character; large coefficients produce
      repetition, empty lines, or derailment. `coef = 0` is bit-identical to off.
-   - *Honest status (updated 2026-11-19, full 20-control rerun):* the repaired
-     vector has a real, significantly-above-random target pull (L16 +3.54 vs
-     p95 +2.00, T1 PASS), and it moved all 10 held-out prompts positive. It is
-     **not** uniquely semantic: collateral 3.04 > random median 2.61 (T2 FAIL)
-     and 4/20 random directions were also 10/10 sign consistent (T4 FAIL).
-     It is a strong, directional nudge, not proof of concept-level control.
+   - *Honest status (2026-11-22, app-format test):* the raw-text results above do
+     **not** transfer to the format the app uses. Measured on chat-templated
+     prompts at the app's unit, every build/injection combination is neutral or
+     negative: raw-built pooled **−1.26 nats** (1/10 positive), raw-built last
+     **−0.99** (0/10), chat-built last **−0.73** (3/10), chat-built pooled
+     **+0.28** with 4/10 signs (one outlier carries it). The slider is a strong
+     perturbation (KL 0.6–3.1 nats) but it does not steer comments in the app's
+     format. `agents/K8_app_format_variants.md`, `proof/c4_app_format.txt`.
 
 2. **Steer neuron** (index + value → `apply`, or `ablate`)
    - Writes an absolute value into that MLP unit at the last position, for
@@ -280,7 +282,7 @@ architectures are **refused**, never guessed.
 | C1 trace | PASS — matches HF hidden states, max diff `0.000e+00` |
 | C2 logit lens | PASS — `0.000e+00` at the final layer |
 | C3 causal patching | PASS — L22–27 recover ≈1.0, L0–20 ≈0 |
-| C4 steering specificity | pre-fix **FAIL** · post-fix **T1 PASS, T2/T4 FAIL** (full 20-control rerun below) |
+| C4 steering specificity | pre-fix FAIL · post-fix T1 PASS/T2/T4 FAIL **on raw text** · **fails in app format** (§5) |
 | C5 mid-generation | PASS — divergence begins after the switch |
 | C6 force vs steer | PASS for forcing; semantic arm provisional |
 | C7 neuron atlas | PASS at threshold 1e-6 (coverage, not meaning) |
@@ -426,11 +428,13 @@ upper bound on zero flips); 384 narrows it to ~1%.
   neuron is an index, not a word.
 - **The 3-D view is a projection.** `z` is layer order (real); `x/y` are PCA.
   Variance explained is printed because it matters.
-- **Steering: target effect proven, specificity unresolved.** The estimator fix
-  (2026-11-19) gives a real, sign-consistent, above-random pull (T1 PASS at
-  coef 1). Random matched-norm directions are also sign consistent (T4 FAIL)
-  and cheaper on collateral (T2 FAIL) — so the knob is a directional poke, not
-  certified semantic control. Full rerun in §5 and `proof/c4_post_fix_20controls.txt`.
+- **Steering does not work in the app's own format (2026-11-22).** On raw
+  `def …:` text the repaired vector moves the comment target (+4.35 nats,
+  9/10 prompts). On chat-templated prompts — what `app/server.py` actually
+  sends — every variant is neutral or negative (raw-built pooled −1.26, last
+  −0.99, chat-built last −0.73, chat-built pooled +0.28 with 4/10 signs).
+  The slider perturbs strongly (KL 0.6–3.1 nats) but does not steer the concept
+  it was built for. `agents/K8_app_format_variants.md`.
 - **Long context is not tested.** 32k is configured; nothing here validates it.
 
 ---

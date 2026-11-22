@@ -1,0 +1,99 @@
+C4 in the app's format — does the shipped vector steer the concept?
+==============================================================================
+generated          : 2026-11-22T14:44:54+00:00
+model              : .hf/granite-hf  (40 layers, d=2048, vocab=49159, torch.float32)
+layer              : 8  (steer at resid_pre(L8) via the daemon's layer-8 pre-hook (== set_steer(site='pre')); build at resid_post(L7) == resid_pre(L8))
+coef               : 1.0  (unit = one residual norm, ‖v‖ = 5.3459)
+unit               : mean last-position resid_pre(L8) norm of the chat-rendered DEFAULT_POS[0] and DEFAULT_NEG[0] prompts — app residual_scale() (server.py:517-555,847-849)
+logits_scaling     : 8.0  (applied INSIDE the model: GraniteForCausalLM divides the head output by it; adapter.py:295 does the same for the lens)
+target effect unit : nats — Δ(log p(comment) − log p(code)) on the returned logits
+nats-unit evidence : max|logit|=20.55  p_top=0.7428  H=1.32 nats  (pre-scaling logits would be ~8x larger and ~one-hot)
+                     returned logit gaps are nats; dividing by 8 again (K3 H18 / K5 convention) double-counts logits_scaling
+prompts            : 10 HELDOUT (same 10 as steering_test.py / verify_c4.py)
+contrast           : raw (adapter.build_steer_vectors tokenises the text directly; chat templating is used for the unit only)
+cos(pooled,last)   : 0.2373
+token classes      : comment=[21, 433, 588] code=[106, 264, 325, 589, 601, 784, 823, 979]
+
+SCREEN — 4 arms, coef 1
+------------------------------------------------------------------------------
+arm                te nats   K3 conv   KL nats  KL worst     +/-/0   sign p  verdict
+chat_pooled        -1.2604   -0.1575   1.71857  10.50777     1/9/0   0.0156  NO_EFFECT
+chat_last          -0.9913   -0.1239   1.90549   6.42963    0/10/0   0.0020  NO_EFFECT
+raw_pooled         +4.3486   +0.5436   3.13947   4.46093     9/1/0   0.0039  ABLATION_EFFECT
+raw_last           +1.3722   +0.1715   0.57839   1.61871     9/1/0   0.0059  ABLATION_EFFECT
+
+DECISIVE NULL — not run
+------------------------------------------------------------------------------
+No chat-format arm has a positive target effect, so there is no
+effect to match: S = KL_real / median(KL_null at matched te) is
+undefined and the pre-registered rule already returns NO_EFFECT.
+With a negative te the vector moves the concept the wrong way;
+scaling the same direction up cannot make it a steering knob.
+
+PER-PROMPT (te nats / KL nats)
+------------------------------------------------------------------------------
+[chat_pooled]  te=-1.2604  KL=1.71857   [K3-convention te (=raw/8) -0.1575]
+  def merge(a, b):\n            -0.9639   1.06986
+  class Cache:\n                +1.5632  10.50777
+  async def fetch(url):\n       -2.0922   0.69577
+  def parse(x):\n               -2.5239   0.99922
+  with open(path) as fh:\n      -0.6414   0.05983
+  while queue:\n                -1.6408   0.59613
+  def to_json(obj):\n           -1.4183   0.95605
+  for k, v in d.items():\n      -0.8134   0.10705
+  def main():\n                 -2.5589   0.62925
+  try:\n                        -1.5142   1.56480
+
+[chat_last]  te=-0.9913  KL=1.90549   [K3-convention te (=raw/8) -0.1239]
+  def merge(a, b):\n            -0.6549   4.45987
+  class Cache:\n                -0.2016   2.13009
+  async def fetch(url):\n       -0.2114   2.79977
+  def parse(x):\n               -1.6592   1.16113
+  with open(path) as fh:\n      -0.2089   0.03737
+  while queue:\n                -0.8886   0.38176
+  def to_json(obj):\n           -0.6363   6.42963
+  for k, v in d.items():\n      -0.7843   0.09552
+  def main():\n                 -3.7059   0.88168
+  try:\n                        -0.9621   0.67810
+
+[raw_pooled]  te=+4.3486  KL=3.13947   [K3-convention te (=raw/8) +0.5436]
+  def merge(a, b):\n            +3.7424   4.16370
+  class Cache:\n                +5.5511   3.95299
+  async def fetch(url):\n       +6.2652   2.28528
+  def parse(x):\n               +4.7618   4.46093
+  with open(path) as fh:\n      +7.6115   4.12887
+  while queue:\n                +1.2217   1.21268
+  def to_json(obj):\n           +7.8006   4.23767
+  for k, v in d.items():\n      +3.3776   4.17452
+  def main():\n                 +3.3872   2.24202
+  try:\n                        -0.2335   0.53600
+
+[raw_last]  te=+1.3722  KL=0.57839   [K3-convention te (=raw/8) +0.1715]
+  def merge(a, b):\n            +1.8173   0.19657
+  class Cache:\n                +2.1847   0.74650
+  async def fetch(url):\n       +1.1301   0.71951
+  def parse(x):\n               +2.2284   0.31064
+  with open(path) as fh:\n      +1.1029   0.69608
+  while queue:\n                +0.8094   0.50639
+  def to_json(obj):\n           +2.7742   1.61871
+  for k, v in d.items():\n      +1.8422   0.60787
+  def main():\n                 +0.0474   0.21332
+  try:\n                        -0.2147   0.16833
+
+VERDICT PER ARM
+------------------------------------------------------------------------------
+chat_pooled     NO_EFFECT             target effect is not positive in the app format; the direction does not steer the concept
+chat_last       NO_EFFECT             target effect is not positive in the app format; the direction does not steer the concept
+raw_pooled      ABLATION_EFFECT       raw render is not the app format (K3 H4); ablation only
+raw_last        ABLATION_EFFECT       raw render is not the app format (K3 H4); ablation only
+
+Rule: STEERS only if te > 0 in the chat-format arm AND S < 1 AND rank p < 0.05.
+      te <= 0 -> NO_EFFECT. te > 0 but S >= 1 or p >= 0.05 -> PERTURBS.
+      Raw-render arms are ABLATION_*; they are not the app's format (K3 H4).
+
+NO_EFFECT means no positive effect on the TARGET CONCEPT. It does not mean
+nothing happens: the same slider move leaves a large full-vocabulary KL
+(1.7-1.9 nats in chat format), i.e. it is a perturbation knob, not steering.
+'K3 conv' is the raw/8 value used by proof/c4_decisive.* and K5; it
+double-counts logits_scaling, which the model already applies, so it is 8x
+too small. 'te nats' is the correct natural-log value.

@@ -520,17 +520,24 @@ def residual_scale(adapter, batches) -> dict[int, float]:
     Two things make this the honest unit, both measured on Granite 3.3 fp32:
 
     1. The server steers `positions="last"` only, so the position whose norm
-       matters is the last one. `build_steer_vectors()` normalises to
-       ‖mean over positions of h‖ instead; at layers 9+ a single high-norm token
-       inside the prompt inflates that mean ~14x above the last-position norm
-       (73.8 vs 5.2 at L9), so `coef = 1` was a 14-residual-norm edit.
-    2. The prompts must be rendered the way generation renders them. A raw
-       un-templated code string has an even bigger inflation (405 vs 74 at L9,
-       77x the in-distribution value) — the same text as a chat turn is stable.
+       matters is the last one. `build_steer_vectors()` defaults to
+       `position="pooled"` and normalises to the norm of a mean over positions
+       1..T-1; that pooled vector is *smaller* than the last-position norm, not
+       larger: 0.62-0.66x at L8/L9 on Granite, so this rescale is a modest
+       ~1.2-1.5x correction.
+    2. The prompts must be rendered the way generation renders them, because the
+       scale is read at the last position of the chat-rendered transcript.
 
-    The returned number is the same quantity the token trace reports as
-    `layers[l].norm` (last position, resid_post), so a user can read the slider
-    unit straight off the panel.
+    The old 14x/77x story in this docstring described the PRE-FIX estimator that
+    still included position 0. Position 0 is the attention-sink spike
+    (‖h[0]‖ ~ 4.3e3 vs ~6.3 at the last position at L9), so including it made the
+    pooled vector enormous (norm ~78.7, 14-77x the in-distribution unit). The
+    shipped estimator excludes position 0; those numbers do not describe it.
+
+    The returned number is read at resid_pre (the layer input), which is also
+    where `set_steer` writes. The token trace's `layers[l].norm` is read at
+    resid_post (the layer output), i.e. resid_pre of layer l+1, so the two
+    differ by one block and are not numerically identical.
     """
     prev = (adapter._capturing, adapter._capture_full)
     acc: dict[int, list[float]] = {}
@@ -827,12 +834,16 @@ class Engine:
     def __init__(self, path: str, dtype: torch.dtype):
         # load() calls guard.require() and refuses BF16 -> float16.
         self.adapter = LiveAdapter(path).load(dtype=dtype)
-        # H3-3: default contrast pairs, all token positions, same suffix.
+        # H3-3: default contrast pairs, position-averaged (`position="pooled"`),
+        # same suffix. This stays the shipped vector; `position="last"` would be
+        # the choice aligned with `set_steer(positions="last")` and is a
+        # different intervention (see `build_steer_vectors`).
         built = self.adapter.build_steer_vectors()
         # PROTOCOL: one coef unit = the layer's mean residual norm. Measure it on
-        # chat-rendered text (the format generation actually uses) and rescale:
-        # the estimator normalises to an uncentred positional mean built from raw
-        # text, which on Granite is up to 77x the in-distribution residual norm.
+        # chat-rendered text (the format generation actually uses) and rescale.
+        # The pooled vector is ~0.62-0.66x the last-position norm at L8/L9 on
+        # Granite, so this is a ~1.2-1.5x correction. (The 14x/77x figure belongs
+        # to the pre-fix estimator that included position 0.)
         scale = residual_scale(self.adapter, [
             self.adapter.format_messages([{"role": "user", "content": t}])
             for t in (DEFAULT_POS[0], DEFAULT_NEG[0])])

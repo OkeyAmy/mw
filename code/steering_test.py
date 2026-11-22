@@ -5,14 +5,13 @@ steering_test.py — the decisive test for C4.
 Pre-registered before running. The question: does a diff-in-means steering
 vector do something a RANDOM vector of matched norm cannot?
 
-Three independent tests, all required:
+Four independent tests, all required:
 
   T1 SELECTIVITY      real target effect > 95th pct of 20 random vectors
   T2 COLLATERAL       real control effect <= median of random controls
                       (a real direction should NOT disturb unrelated logits)
   T3 BEHAVIOUR        generating with the vector produces more comment lines
                       than without, by more than 95th pct of random vectors
-
   T4 HELD-OUT SIGN    the effect direction is consistent on prompts never used
                       to build the vector (>=80%, and above random p95)
 
@@ -20,19 +19,26 @@ If T1-T4 pass -> steering is real and specific.
 If they fail  -> diff-in-means steering at this scale is not distinguishable
                  from noise, and every product based on "control" is unfounded.
 
+The vector is built from mw.adapter.DEFAULT_POS / DEFAULT_NEG (8 contrast
+pairs). TRAIN_POS / TRAIN_NEG, the 16 hand-written pairs from an earlier draft,
+were never used and have been deleted.
+
 Usage: python code/steering_test.py [--model PATH] [--quick]
-Writes: proof/c4_decisive.json, proof/c4_decisive.txt
+Writes: proof/c4_decisive.{json,txt} (decisive)
+        proof/c4_quick.{json,txt}    (--quick: SCREEN ONLY, not decisive)
 """
-from pathlib import Path
 from __future__ import annotations
 
 import argparse
 import json
 import os
 import statistics
+import subprocess
 import sys
+from pathlib import Path
 
 import torch
+from mw.adapter import DEFAULT_NEG, DEFAULT_POS
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -40,34 +46,7 @@ ROOT = Path(__file__).resolve().parent.parent
 torch.set_num_threads(4)
 PROOF = f"{ROOT}/proof"
 LAYER = 8
-
-# ---- TRAIN set (used ONLY to build the vector) -----------------------------
-TRAIN_POS = [
-    "# add two numbers and return the result\n",
-    "# read the file and parse each line as json\n",
-    "# raise an error if the input is empty\n",
-    "# loop over every item in the list\n",
-    "# this class stores user credentials\n",
-    "# return the cached value if present\n",
-    "# validate the request before processing\n",
-    "# write the output to disk\n",
-    "# handle the case where the key is missing\n",
-    "# compute the mean of the array\n",
-    "# connect to the database\n",
-    "# send the payload to the server\n",
-    "# sort the results by score descending\n",
-    "# close the socket when finished\n",
-    "# retry the request three times\n",
-    "# convert the timestamp to utc\n",
-]
-TRAIN_NEG = [
-    "def add(a, b):\n", "for line in f:\n", "if not data:\n", "for x in items:\n",
-    "class User:\n", "return cache.get(k)\n", "def handle(req):\n",
-    "with open(p, 'w') as f:\n", "try:\n", "total = sum(xs)\n",
-    "conn = sqlite3.connect(p)\n", "requests.post(url, json=body)\n",
-    "results.sort(key=lambda r: -r.score)\n", "sock.close()\n",
-    "for _ in range(3):\n", "ts = datetime.utcfromtimestamp(t)\n",
-]
+EXPECT_LAYERS = 40
 
 # ---- HELD-OUT prompts (never used to build the vector) ---------------------
 HELDOUT = [
@@ -97,13 +76,62 @@ def pct(xs, p):
     xs = sorted(xs)
     if not xs:
         return float("nan")
-    k = min(len(xs) - 1, max(0, int(round(p / 100 * (len(xs) - 1)))))
+    k = min(len(xs) - 1, max(0, round(p / 100 * (len(xs) - 1))))
     return xs[k]
+
+
+# ---- hard guards (H12) -----------------------------------------------------
+# A zero / non-finite vector, or a steering hook that changes nothing, must
+# never produce an artifact. Both failures are silent no-ops otherwise.
+def guard_vector(vec, name="steering vector") -> float:
+    """Raise RuntimeError unless `vec` is finite and has norm > 1e-6."""
+    if vec is None:
+        raise RuntimeError(f"{name} is None (no vector was built)")
+    if not bool(torch.isfinite(vec).all()):
+        raise RuntimeError(f"{name} contains NaN/Inf")
+    norm = float(vec.norm())
+    if not (norm > 1e-6):
+        raise RuntimeError(f"{name} has norm {norm:.3e} <= 1e-6 (no-op steering)")
+    return norm
+
+
+def guard_steering_changes_logits(base_logits, steered_logits, tol=1e-6) -> float:
+    """Raise RuntimeError unless steering moved at least one logit by > tol."""
+    if base_logits is None or steered_logits is None:
+        raise RuntimeError("guard needs base and steered logits")
+    delta = float((steered_logits - base_logits).abs().max())
+    if not (delta > tol):
+        raise RuntimeError(
+            f"steering changed no logit (max|steered-base| = {delta:.3e} <= {tol:.0e}); "
+            "hook is inactive or the vector cancels"
+        )
+    return delta
+
+
+def git_sha() -> str:
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(ROOT), capture_output=True, text=True, timeout=10, check=False,
+        ).stdout.strip() or "unknown"
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+
+
+def check_model_config(model_type, n_layers, path) -> None:
+    """Raise RuntimeError unless this is the pre-registered Granite model."""
+    if model_type != "granite" or n_layers != EXPECT_LAYERS:
+        raise RuntimeError(
+            f"unsupported model for the C4 test: model_type={model_type!r}, "
+            f"layers={n_layers}, expected 'granite' / {EXPECT_LAYERS} "
+            f"(got --model {path}). The pre-registered run is IBM Granite 3.3 2B "
+            f"at layer {LAYER}; use --model .hf/granite-hf."
+        )
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", default=f"{ROOT}/.hf/bf16-hf")
+    ap.add_argument("--model", default=f"{ROOT}/.hf/granite-hf")
     ap.add_argument("--randoms", type=int, default=20)
     ap.add_argument("--behav-randoms", type=int, default=10)
     ap.add_argument("--behav-tokens", type=int, default=10)
@@ -116,6 +144,15 @@ def main() -> int:
     model = AutoModelForCausalLM.from_pretrained(
         args.model, dtype=torch.float32, attn_implementation="eager"
     ).eval()
+
+    # ---- model guard (H11): this harness only speaks Granite L8 -------------
+    model_type = getattr(model.config, "model_type", None)
+    n_layers = len(model.model.layers)
+    try:
+        check_model_config(model_type, n_layers, args.model)
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
 
     steer = {"layer": None, "vec": None, "coef": 0.0}
 
@@ -136,7 +173,7 @@ def main() -> int:
     def mk_cap(i):
         def hook(mod, a, o):
             t = o[0] if isinstance(o, tuple) else o
-            caps[i] = t[:, -1, :].detach()
+            caps[i] = t.detach()
         return hook
 
     model.model.layers[LAYER].register_forward_hook(mk_cap(LAYER))
@@ -167,28 +204,74 @@ def main() -> int:
         return abs(a) + abs(b)
 
     # ---- build vector ------------------------------------------------------
-    pos = torch.stack([resid(t) for t in TRAIN_POS])
-    neg = torch.stack([resid(t) for t in TRAIN_NEG])
-    v = pos.mean(0) - neg.mean(0)
-    resid_norm = float(pos.norm(dim=-1).mean())
-    v = v / max(float(v.norm()), 1e-8) * resid_norm
-    print(f"vector built: {len(TRAIN_POS)} pairs, layer {LAYER}, norm {float(v.norm()):.2f}",
-          file=sys.stderr)
+    # Same estimator the app ships (adapter.build_steer_vectors): contrast pairs
+    # share a prefix and suffix so only the in-body comment differs, and pooling
+    # excludes token 0 (the attention-sink spike). Calibrated to the mean
+    # last-position residual norm on HELDOUT, matching verify_c4.py.
+    def pooled(text):
+        row = resid(text)                          # [T, d]
+        return (row[1:] if row.shape[0] > 1 else row).mean(0)
 
-    def measure(vec, coef=2.0):
-        """Return (mean target effect, mean control effect, sign consistency)."""
-        steer.update(layer=LAYER, vec=vec, coef=coef)
-        te, ce, signs = [], [], []
+    pos = torch.stack([pooled(t) for t in DEFAULT_POS])
+    neg = torch.stack([pooled(t) for t in DEFAULT_NEG])
+    v = pos.mean(0) - neg.mean(0)
+    resid_norm = statistics.mean(float(resid(t)[-1].norm()) for t in HELDOUT)
+    v = v / max(float(v.norm()), 1e-8) * resid_norm
+
+    # ---- guards (H12): never score a no-op --------------------------------
+    try:
+        unit = guard_vector(v)
+    except RuntimeError as exc:
+        print(f"FATAL: {exc}\nRefusing to run or write any proof artifact.", file=sys.stderr)
+        return 1
+    print(f"vector built: {len(DEFAULT_POS)} pairs, layer {LAYER}, norm {unit:.2f}"
+          f" (residual unit {resid_norm:.2f})", file=sys.stderr)
+
+    # ---- baselines (H3): compute ONCE, steering OFF, before any steer.update
+    # The old loop recomputed `base` inside the prompt loop while steering was
+    # already active, so prompt 1 always had delta 0. Fixed form, as in
+    # verify_c4.py:103-108.
+    @torch.no_grad()
+    def compute_baselines():
+        steer.update(layer=LAYER, vec=None, coef=0.0)
+        lgs, tes = {}, []
         for p in HELDOUT:
-            base = target_eff(last_logits(p))
+            lg = last_logits(p)
+            lgs[p] = lg
+            tes.append(target_eff(lg))
+        return lgs, tes
+
+    base_logits, BASE_TE = compute_baselines()
+
+    # ---- guard: the first steered forward must actually move a logit ------
+    try:
+        with torch.no_grad():
+            steer.update(layer=LAYER, vec=v, coef=1.0)
+            first_steered = last_logits(HELDOUT[0])
+        moved = guard_steering_changes_logits(base_logits[HELDOUT[0]], first_steered)
+    except RuntimeError as exc:
+        print(f"FATAL: {exc}\nRefusing to run or write any proof artifact.", file=sys.stderr)
+        return 1
+    finally:
+        steer.update(layer=LAYER, vec=None, coef=0.0)
+    print(f"steering guard: max|steered-base| on prompt 1 = {moved:.3f}", file=sys.stderr)
+
+    def measure(vec, coef=1.0):
+        """Return (mean target effect, mean control effect, sign consistency).
+
+        Target deltas are taken against the precomputed, steering-off baselines;
+        control effects stay absolute (unchanged T2 metric, out of scope here).
+        """
+        te, ce, signs = [], [], []
+        try:
             steer.update(layer=LAYER, vec=vec, coef=coef)
-            st = target_eff(last_logits(p))
-            steer.update(layer=LAYER, vec=None, coef=0.0)
-            d = st - base
-            te.append(d)
-            signs.append(1 if d > 0 else 0)
-            steer.update(layer=LAYER, vec=vec, coef=coef)
-            ce.append(ctrl_eff(last_logits(p)))
+            for i, p in enumerate(HELDOUT):
+                lg = last_logits(p)          # one forward serves both metrics
+                d = target_eff(lg) - BASE_TE[i]
+                te.append(d)
+                signs.append(1 if d > 0 else 0)
+                ce.append(ctrl_eff(lg))
+        finally:
             steer.update(layer=LAYER, vec=None, coef=0.0)
         return (statistics.mean(te), statistics.mean(ce), sum(signs) / len(signs))
 
@@ -205,16 +288,18 @@ def main() -> int:
     # ---- behaviour ---------------------------------------------------------
     @torch.no_grad()
     def gen_comment_count(vec, coef, prompt):
-        steer.update(layer=LAYER, vec=vec, coef=coef)
-        ids = tok(prompt, return_tensors="pt").input_ids
-        out = model.generate(ids, max_new_tokens=args.behav_tokens,
-                             do_sample=False, pad_token_id=tok.eos_token_id)
-        steer.update(layer=LAYER, vec=None, coef=0.0)
-        txt = tok.decode(out[0, ids.shape[1]:], skip_special_tokens=True)
+        try:
+            steer.update(layer=LAYER, vec=vec, coef=coef)
+            ids = tok(prompt, return_tensors="pt").input_ids
+            out_ids = model.generate(ids, max_new_tokens=args.behav_tokens,
+                                     do_sample=False, pad_token_id=tok.eos_token_id)
+        finally:
+            steer.update(layer=LAYER, vec=None, coef=0.0)
+        txt = tok.decode(out_ids[0, ids.shape[1]:], skip_special_tokens=True)
         return txt.count("#")
 
     base_counts = [gen_comment_count(None, 0.0, p) for p in HELDOUT]
-    real_counts = [gen_comment_count(v, 2.0, p) for p in HELDOUT]
+    real_counts = [gen_comment_count(v, 1.0, p) for p in HELDOUT]
     behav_delta = statistics.mean(real_counts) - statistics.mean(base_counts)
 
     rng2 = torch.Generator().manual_seed(99)
@@ -222,7 +307,7 @@ def main() -> int:
     for _ in range(args.behav_randoms):
         rv = torch.randn(v.shape, generator=rng2)
         rv = rv / rv.norm() * v.norm()
-        c = [gen_comment_count(rv, 2.0, p) for p in HELDOUT]
+        c = [gen_comment_count(rv, 1.0, p) for p in HELDOUT]
         rand_deltas.append(statistics.mean(c) - statistics.mean(base_counts))
 
     # ---- verdicts ----------------------------------------------------------
@@ -238,7 +323,27 @@ def main() -> int:
     ok = T1 and T2 and T3 and T4
 
     out = {
-        "layer": LAYER, "randoms": args.randoms,
+        # ---- provenance (H16) ---------------------------------------------
+        "model": args.model,
+        "model_id": getattr(model.config, "_name_or_path", None) or args.model,
+        "arch": model_type,
+        "dtype": str(next(model.parameters()).dtype),
+        "n_layers": n_layers,
+        "layer": LAYER,
+        "coef": 1.0,
+        "unit": float(v.norm()),
+        "unit_definition": "mean last-position resid_post L8 norm on HELDOUT; "
+                           "vector scaled so coef 1 == this norm",
+        "prompt_render": "raw",
+        "vector_source": "mw.adapter.DEFAULT_POS/NEG via daemon",
+        "n_vector_pairs": len(DEFAULT_POS),
+        "behav_randoms": args.behav_randoms,
+        "behav_tokens": args.behav_tokens,
+        "quick": bool(args.quick),
+        "decisive": not args.quick,
+        "git_sha": git_sha(),
+        # ---- configuration / results --------------------------------------
+        "randoms": args.randoms,
         "real": {"target_eff": real_te, "ctrl_eff": real_ce, "sign_consistency": real_sign,
                  "behav_delta": behav_delta, "behav_base": statistics.mean(base_counts),
                  "behav_real": statistics.mean(real_counts)},
@@ -249,29 +354,41 @@ def main() -> int:
                   "T3_behaviour": T3, "T4_heldout_sign": T4},
         "status": "PASS" if ok else "FAIL",
     }
+    if args.quick:
+        out["SCREEN_ONLY"] = "not decisive: quick mode uses max-of-4/6 gates"
     os.makedirs(PROOF, exist_ok=True)
-    json.dump(out, open(f"{PROOF}/c4_decisive.json", "w"), indent=1)
+    tag = "quick" if args.quick else "decisive"
+    with open(f"{PROOF}/c4_{tag}.json", "w") as fh:
+        json.dump(out, fh, indent=1)
 
+    banner = "SCREEN ONLY — not decisive" if args.quick else "C4 DECISIVE TEST — is the steering vector special?"
     lines = [
-        "C4 DECISIVE TEST — is the steering vector special?",
+        banner,
         "=" * 62,
-        f"layer {LAYER} | {len(TRAIN_POS)} train pairs | {len(HELDOUT)} held-out prompts | "
-        f"{args.randoms} random controls",
+        (f"model {out['model_id']} | {model_type} | {out['dtype']} | {n_layers} layers"
+         f" | steer L{LAYER} | coef {out['coef']:.1f} | unit {out['unit']:.3f}"),
+        (f"{len(DEFAULT_POS)} vector pairs (DEFAULT_POS/NEG) | {len(HELDOUT)} held-out prompts"
+         f" | {args.randoms} random controls | render {out['prompt_render']}"),
+        (f"git {out['git_sha']} | behav_randoms {args.behav_randoms} | "
+         f"behav_tokens {args.behav_tokens} | quick {out['quick']}"),
         "",
         f"{'metric':<26}{'real':>12}{'random ref':>16}{'pass':>8}",
-        f"{'T1 target effect':<26}{real_te:>12.3f}{te_p95:>16.3f}{str(T1):>8}",
-        f"{'T2 control effect':<26}{real_ce:>12.3f}{ce_med:>16.3f}{str(T2):>8}",
-        f"{'T3 behaviour delta':<26}{behav_delta:>12.3f}{bd_p95:>16.3f}{str(T3):>8}",
-        f"{'T4 sign consistency':<26}{real_sign:>12.2f}{sign_p95:>16.2f}{str(T4):>8}",
+        f"{'T1 target effect':<26}{real_te:>12.3f}{te_p95:>16.3f}{T1!s:>8}",
+        f"{'T2 control effect':<26}{real_ce:>12.3f}{ce_med:>16.3f}{T2!s:>8}",
+        f"{'T3 behaviour delta':<26}{behav_delta:>12.3f}{bd_p95:>16.3f}{T3!s:>8}",
+        f"{'T4 sign consistency':<26}{real_sign:>12.2f}{sign_p95:>16.2f}{T4!s:>8}",
         "",
         f"baseline comment lines per completion: {statistics.mean(base_counts):.2f}",
         f"with real vector                     : {statistics.mean(real_counts):.2f}",
         "",
         f"VERDICT: {'PASS — steering is specific' if ok else 'FAIL — steering is not distinguishable from noise'}",
     ]
+    if args.quick:
+        lines += ["", "SCREEN ONLY — not decisive. Not written to proof/c4_decisive.*"]
     if not ok:
         lines += ["", "If this fails, the product cannot be 'control'. It must be measurement."]
-    open(f"{PROOF}/c4_decisive.txt", "w").write("\n".join(lines) + "\n")
+    with open(f"{PROOF}/c4_{tag}.txt", "w") as fh:
+        fh.write("\n".join(lines) + "\n")
     print("\n".join(lines))
     print(f"RESULT C4DEC {out['status']} T1={T1} T2={T2} T3={T3} T4={T4} "
           f"real_te={real_te:.3f} rand_p95={te_p95:.3f} behav={behav_delta:.3f}")
